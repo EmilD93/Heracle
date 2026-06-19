@@ -129,7 +129,11 @@ CREATE TABLE registrations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL DEFAULT 'registered',
+    status VARCHAR(50) NOT NULL DEFAULT 'confirmed',
+
+    CONSTRAINT chk_registration_status CHECK (
+        status IN ('confirmed', 'waitlisted', 'cancelled')
+    ),
     registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     -- Constraint: A user can only register once per event
@@ -143,27 +147,68 @@ CREATE INDEX idx_registrations_event_id ON registrations(event_id);
 
 CREATE TABLE notification_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL, -- e.g., 'reminder', 'update', 'cancellation'
-    status VARCHAR(50) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
-    scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL,
+    payload JSONB NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 3,
+    scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    failed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_notification_job_type CHECK (
+        type IN (
+            'RegistrationConfirmed',
+            'RegistrationWaitlisted',
+            'WaitlistPromoted',
+            'EventCancelled'
+        )
+    ),
+
+    CONSTRAINT chk_notification_job_status CHECK (
+        status IN (
+            'pending',
+            'processing',
+            'completed',
+            'failed'
+        )
+    )
 );
 -- Index to optimize foreign key lookups and JOINs
 CREATE INDEX idx_notification_jobs_event_id ON notification_jobs(event_id);
 -- HIGH PERFORMANCE INDEX: Crucial for background workers polling for jobs
 -- Optimizes query: WHERE status = 'pending' AND scheduled_for <= NOW()
 CREATE INDEX idx_notification_jobs_polling ON notification_jobs(status, scheduled_for);
+CREATE INDEX idx_notification_jobs_user_id
+ON notification_jobs(user_id);
 
+CREATE INDEX idx_notification_jobs_registration_id
+ON notification_jobs(registration_id);
 -- 5. NOTIFICATION_LOGS Table
 
 CREATE TABLE notification_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
     job_id UUID NOT NULL REFERENCES notification_jobs(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL, -- 'success', 'failed'
+
+    type VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+
+    message TEXT,
     error_message TEXT,
-    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+
+    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_notification_log_status CHECK (
+        status IN ('success', 'failed')
+    )
 );
 -- Indexes for foreign keys (prevents full table scans on CASCADE deletes)
 CREATE INDEX idx_notification_logs_job_id ON notification_logs(job_id);
