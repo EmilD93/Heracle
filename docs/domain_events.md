@@ -1,23 +1,31 @@
 # Domain Events
 
-A Domain Event is a fact that already happened in the system.
+Domain events are records that something important happened in the system.
 
-It is not an API endpoint.
-It is not called directly by the frontend.
-It is created by backend business logic after something important happens.
+The notification system should create notification jobs after registration, waitlist, promotion, or cancellation actions.
 
-## Events
+## Event Types
 
 ### RegistrationConfirmed
 
-Happens when a student registers for an event and there are available seats.
+Created when a student registers for an event and gets a confirmed seat.
 
-Payload example:
+### RegistrationWaitlisted
 
-```json
-{
-  "event_id": "event-id",
-  "user_id": "user-id",
-  "registration_id": "registration-id",
-  "event_title": "AI Workshop"
-}
+Created when a student registers for a full event and is placed on the waitlist.
+
+### WaitlistPromoted
+
+Created when a waitlisted student is moved into a confirmed seat.
+
+### EventCancelled
+
+Created when an organizer or admin cancels an event.
+
+## Rules
+
+1. Domain events should happen after the database change succeeds.
+2. The API should not send notifications directly.
+3. Each event should create one or more `notification_jobs`.
+4. Jobs should start with status `pending`.
+5. The worker processes the job and writes to `notification_logs`.
