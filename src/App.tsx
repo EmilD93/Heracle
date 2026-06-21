@@ -1,122 +1,74 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
+import { Sidebar } from './components/Sidebar'
+import { Dashboard } from './components/Dashboard'
+import { EventDetails } from './components/EventDetails'
+import { OrganizerDashboard } from './components/OrganizerDashboard'
+import { useScreenInit } from './useScreenInit.js'
 
-function App() {
-  const [count, setCount] = useState(0)
+export function App() {
+  const screenInit = useScreenInit()
+  const [activeTab, setActiveTab] = useState<string>(
+    screenInit?.activeTab ?? 'dashboard',
+  )
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(
+    screenInit?.selectedEventId ?? null,
+  )
+  
+  // Нов Стейт за състоянието на страничното меню
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    setSelectedEventId(null)
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="flex h-screen w-full bg-[#f1f5f9] p-4 gap-4 font-sans overflow-hidden">
+      {/* Подаваме състоянието и функцията за промяна на менюто */}
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+      />
 
-      <div className="ticks"></div>
+      <main className="flex-1 bg-white/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/60 shadow-sm overflow-hidden relative flex flex-col">
+        <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-blue-50/80 to-transparent pointer-events-none" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-40 -left-40 w-96 h-96 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+        <div className="relative z-10 h-full flex flex-col">
+          <AnimatePresence mode="wait">
+            {activeTab === 'dashboard' && !selectedEventId && (
+              <Dashboard key="dashboard" onEventSelect={setSelectedEventId} />
+            )}
+            {activeTab === 'dashboard' && selectedEventId && (
+              <EventDetails
+                key="details"
+                eventId={selectedEventId}
+                onBack={() => setSelectedEventId(null)}
+              />
+            )}
+            {activeTab === 'organizer' && (
+              <OrganizerDashboard key="organizer" />
+            )}
+            {activeTab !== 'dashboard' && activeTab !== 'organizer' && (
+              <div
+                key="construction"
+                className="flex items-center justify-center h-full text-slate-400 flex-col gap-5"
+              >
+                <div className="w-20 h-20 rounded-[1.5rem] bg-white/80 shadow-sm border border-slate-100 flex items-center justify-center">
+                  <span className="text-3xl">🚧</span>
+                </div>
+                <p className="font-bold text-xl text-slate-500">
+                  This section is under construction
+                </p>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </main>
+    </div>
   )
 }
-
-export default App
