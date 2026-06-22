@@ -87,6 +87,82 @@ DELETE /api/events/{event_id}/registrations/{registration_id}
 └── Status Codes: 204, 400, 401, 404
 ```
 
+### API Request/Response Examples
+
+#### Register Student (Confirmed)
+
+**Request**
+
+```json
+{
+    "student_id": "stu_001"
+}
+```
+
+**Response (201 Created)**
+
+```json
+{
+    "registration_id": "123",
+    "status": "confirmed"
+}
+```
+
+#### Register Student (Waitlisted)
+
+**Request**
+
+```json
+{
+    "student_id": "stu_002"
+}
+```
+
+**Response (201 Created)**
+
+```json
+{
+    "registration_id": "124",
+    "status": "waitlisted",
+    "position": 3
+}
+```
+
+#### Cancel Registration
+
+**Response (204 No Content)**
+
+```json
+{}
+```
+
+#### Get Waitlist
+
+**Response (200 OK)**
+
+```json
+{
+    "event_id": "evt_100",
+    "waitlist_count": 2,
+    "items": [
+        {
+            "registration_id": "124",
+            "student_id": "stu_002",
+            "status": "waitlisted",
+            "position": 1,
+            "created_at": "2026-06-22T10:05:00Z"
+        },
+        {
+            "registration_id": "125",
+            "student_id": "stu_003",
+            "status": "waitlisted",
+            "position": 2,
+            "created_at": "2026-06-22T10:06:00Z"
+        }
+    ]
+}
+```
+
 ### Waitlist Endpoints
 
 ```
@@ -201,6 +277,62 @@ RegistrationCancelled = {
     "registration_id": str,
     "timestamp": datetime
 }
+```
+
+### Canonical Event Naming Standard
+
+Queue and Worker must use these exact names:
+
+- `RegistrationConfirmed`
+- `RegistrationWaitlisted`
+- `WaitlistPromoted`
+- `RegistrationCancelled`
+
+And these exact `type` values:
+
+- `registration.confirmed`
+- `registration.waitlisted`
+- `waitlist.promoted`
+- `registration.cancelled`
+
+---
+
+## 7️⃣ Sequence Diagram (Registration → Waitlist → Promotion)
+
+```mermaid
+sequenceDiagram
+    participant Student
+    participant API
+    participant RegistrationService as Registration Service
+    participant DB as Database
+    participant Queue
+    participant Worker
+
+    Student->>API: POST /api/events/{id}/register
+    API->>RegistrationService: validate + process registration
+    RegistrationService->>DB: check event capacity + duplicates
+
+    alt seats available
+        RegistrationService->>DB: insert registration(status=confirmed)
+        RegistrationService->>Queue: publish registration.confirmed
+        Queue->>Worker: deliver event
+        Worker-->>Student: confirmation notification
+        API-->>Student: 201 {registration_id, status=confirmed}
+    else event full
+        RegistrationService->>DB: insert registration(status=waitlisted, position)
+        RegistrationService->>Queue: publish registration.waitlisted
+        Queue->>Worker: deliver event
+        Worker-->>Student: waitlist notification
+        API-->>Student: 201 {registration_id, status=waitlisted, position}
+    end
+
+    Student->>API: DELETE /api/events/{id}/registrations/{registration_id}
+    API->>RegistrationService: cancel registration
+    RegistrationService->>DB: update status=cancelled
+    RegistrationService->>DB: promote oldest waitlisted (FIFO)
+    RegistrationService->>Queue: publish waitlist.promoted
+    Queue->>Worker: deliver event
+    Worker-->>Student: promotion notification
 ```
 
 ---
