@@ -1,21 +1,12 @@
-# System Database Design Document
+# Database Design Document & Final Deliverables
 
-## Task 1: Relational SQL Database Selection
+Този документ отразява финалните изисквания и обратната връзка от Team Lead-а.
 
-### Why PostgreSQL?
-For this system, which handles Users, Events, Registrations, and Notification Jobs, **PostgreSQL** is the optimal choice. It is selected due to its:
-1. **Robust Concurrency Control**: PostgreSQL's MVCC ensures background notification jobs and user event registrations don't lock each other, maintaining high throughput.
-2. **Performance under Load**: Excellent query optimizer, parallel query execution, and support for advanced optimization strategies like table partitioning (e.g., partitioning `notification_logs` by month to handle massive volume).
-3. **Advanced Indexing**: Support for BRIN, partial indexes, and composite indexes which are crucial for polling `notification_jobs` efficiently.
-4. **Data Integrity**: Enforces strict `CHECK` constraints to keep business logic sound at the database layer, drastically reducing application-level bugs.
-
----
-
-## Task 2: Entity-Relationship (ER) Diagram
+## Deliverable 1: Final ER Diagram
 
 ```mermaid
 erDiagram
-    USERS ||--o{ REGISTRATIONS : "registers for"
+    USERS ||--o{ REGISTRATIONS : "has"
     EVENTS ||--o{ REGISTRATIONS : "has"
     USERS ||--o{ NOTIFICATION_LOGS : "receives"
     EVENTS ||--o{ NOTIFICATION_JOBS : "triggers"
@@ -25,6 +16,8 @@ erDiagram
     USERS {
         uuid id PK
         string email
+        string password_hash
+        string role "STUDENT / ORGANIZER"
         string first_name
         string last_name
         datetime created_at
@@ -34,6 +27,8 @@ erDiagram
         uuid id PK
         string title
         text description
+        int capacity
+        string status "DRAFT / PUBLISHED / CANCELLED"
         datetime start_time
         datetime end_time
         uuid organizer_id FK
@@ -42,16 +37,18 @@ erDiagram
 
     REGISTRATIONS {
         uuid id PK
-        uuid user_id FK
+        uuid student_id FK
         uuid event_id FK
-        string status
-        datetime registered_at
+        string status "CONFIRMED / WAITLISTED / CANCELLED"
+        datetime created_at
+        int position
     }
 
     NOTIFICATION_JOBS {
         uuid id PK
         uuid event_id FK
         string type
+        jsonb payload
         string status
         datetime scheduled_for
         datetime created_at
@@ -69,104 +66,145 @@ erDiagram
 
 ---
 
-## Task 3: PostgreSQL Schema Definition & Optimization
-
-The following schema is designed with a strong focus on **Constraints**, **Indexing**, **Relationships**, and overall **Performance**.
-
-### Performance & Optimization Strategies
-
-1. **Constraints**:
-   - **Data Integrity**: `UNIQUE (user_id, event_id)` on `registrations` prevents duplicate entries gracefully.
-   - **Business Logic Enforcement**: `CHECK (start_time < end_time)` on `events` enforces logical consistency without application-level overhead.
-   - **Automated Cleanup**: Strict `REFERENCES` with `ON DELETE CASCADE` or `SET NULL` ensure referential integrity and clean up orphaned rows efficiently when events or users are deleted.
-2. **Indexing Strategy**:
-   - **Foreign Key Indexes**: PostgreSQL does not automatically index foreign keys. Explicit indexes on `event_id`, `organizer_id`, `user_id`, and `job_id` are added to prevent full table scans during `JOIN` or `DELETE CASCADE` operations.
-   - **Targeted Composite Indexes**: The `idx_notification_jobs_polling` index on `(status, scheduled_for)` is a vital performance optimization. A background worker polling for jobs will execute `WHERE status = 'pending' AND scheduled_for <= NOW()`. This composite index makes that query instant.
-   - **Unique Index Coverage**: The `UNIQUE` constraint implicitly indexes `(user_id, event_id)`. We added a separate index on `event_id` to optimize reverse lookups (e.g., finding all users registered for an event).
-3. **Long-Term Performance (Partitioning)**:
-   - For high-scale systems, `notification_logs` will grow exponentially. A comment is added to consider table partitioning by `sent_at` (e.g., monthly partitions) to allow dropping old logs (`DROP TABLE notification_logs_jan2026`) in milliseconds instead of executing massive `DELETE` queries that bloat the database WAL.
-
-### SQL Schema
+## Deliverable 2: SQL Schema v1
 
 ```sql
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- ==========================================
 -- 1. USERS Table
-
+-- Колаборация: Павел (Auth, Roles, Password Hash)
+-- ==========================================
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'STUDENT' CHECK (role IN ('STUDENT', 'ORGANIZER')),
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
--- Note: 'email' is already implicitly indexed due to UNIQUE constraint.
 
+-- ==========================================
 -- 2. EVENTS Table
-
+-- Колаборация: Пламен (Capacity, Status, Organizer)
+-- ==========================================
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     description TEXT,
+    capacity INT NOT NULL CHECK (capacity > 0),
+    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'PUBLISHED', 'CANCELLED')),
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time TIMESTAMP WITH TIME ZONE NOT NULL,
     organizer_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Constraint: Prevent invalid date ranges at the DB level
     CONSTRAINT chk_events_start_before_end CHECK (start_time < end_time)
 );
--- Index for finding upcoming events quickly
-CREATE INDEX idx_events_start_time ON events(start_time);
--- Index to optimize foreign key lookups and JOINs
-CREATE INDEX idx_events_organizer_id ON events(organizer_id);
 
-
+-- ==========================================
 -- 3. REGISTRATIONS Table
-
+-- Уточнено с Валери: Запазва се position за стабилност, FIFO се води по created_at
+-- ==========================================
 CREATE TABLE registrations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL DEFAULT 'registered',
-    registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Constraint: A user can only register once per event
-    UNIQUE (user_id, event_id)
+    status VARCHAR(50) NOT NULL DEFAULT 'CONFIRMED' CHECK (status IN ('CONFIRMED', 'WAITLISTED', 'CANCELLED')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    position INT
 );
--- Note: UNIQUE (user_id, event_id) implicitly indexes (user_id, event_id).
--- We also need an index on event_id for reverse lookups ("get all users for this event")
-CREATE INDEX idx_registrations_event_id ON registrations(event_id);
 
+-- ==========================================
 -- 4. NOTIFICATION_JOBS Table
-
+-- Колаборация: Роберта (Queue, Worker, Payload)
+-- ==========================================
 CREATE TABLE notification_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL, -- e.g., 'reminder', 'update', 'cancellation'
-    status VARCHAR(50) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
+    type VARCHAR(50) NOT NULL,
+    payload JSONB,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
     scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
--- Index to optimize foreign key lookups and JOINs
-CREATE INDEX idx_notification_jobs_event_id ON notification_jobs(event_id);
--- HIGH PERFORMANCE INDEX: Crucial for background workers polling for jobs
--- Optimizes query: WHERE status = 'pending' AND scheduled_for <= NOW()
-CREATE INDEX idx_notification_jobs_polling ON notification_jobs(status, scheduled_for);
 
+-- ==========================================
 -- 5. NOTIFICATION_LOGS Table
-
+-- ==========================================
 CREATE TABLE notification_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     job_id UUID NOT NULL REFERENCES notification_jobs(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL, -- 'success', 'failed'
+    status VARCHAR(50) NOT NULL,
     error_message TEXT,
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
--- Indexes for foreign keys (prevents full table scans on CASCADE deletes)
-CREATE INDEX idx_notification_logs_job_id ON notification_logs(job_id);
-CREATE INDEX idx_notification_logs_user_id ON notification_logs(user_id);
--- Optional: If logging becomes massive, consider PARTITION BY RANGE (sent_at)
+
+-- ==========================================
+-- INDEXES
+-- ==========================================
+-- users(email) е автоматичен от UNIQUE constraint
+CREATE INDEX idx_events_status ON events(status);
+CREATE INDEX idx_registrations_event_id ON registrations(event_id);
+CREATE INDEX idx_registrations_student_id ON registrations(student_id);
+CREATE INDEX idx_notification_jobs_polling ON notification_jobs(status, scheduled_for);
+
+-- ==========================================
+-- UNIQUE CONSTRAINTS (Ограничения)
+-- ==========================================
+-- Един потребител не може да има две активни регистрации за едно и също събитие
+CREATE UNIQUE INDEX unique_active_registration ON registrations(student_id, event_id) WHERE status != 'CANCELLED';
 ```
+
+---
+
+## Deliverable 3: Indexes, Constraints, Relationships
+
+### 1. Indexes (Индекси)
+Описани финално според изискванията:
+- **`users(email)`**: Създава се автоматично чрез `UNIQUE` constraint-а. Използва се за логин от Павел.
+- **`events(status)`**: Оптимизира заявките на Пламен при филтриране на `PUBLISHED` събития.
+- **`registrations(event_id)`**: Позволява на Валери бързо да дърпа всички регистрирани за събитие.
+- **`registrations(student_id)`**: Оптимизира изваждането на историята и статуса на даден студент.
+- **`notification_jobs(status, scheduled_for)`**: Композитен индекс, критичен за Queue Worker-а на Роберта, който трябва непрекъснато да търси `pending` задачи.
+
+### 2. Database Constraints (Ограничения)
+
+- **За логиката на Валери**: **Един потребител не може да има две активни регистрации за едно и също събитие**.
+  *Реализация*: Използван е Partial Unique Index (`CREATE UNIQUE INDEX ... WHERE status != 'CANCELLED'`). Това позволява на студента да се запише, да се откаже, и после пак да се запише, без базата да хвърли грешка, но никога не може да има два активни (`CONFIRMED` или `WAITLISTED`) записа едновременно.
+- **Валидация на данни**: Използват се `CHECK` constraints за роли (`STUDENT`, `ORGANIZER`), статуси на събития (`DRAFT`, `PUBLISHED`, `CANCELLED`) и регистрации.
+- **Бизнес логика**: Защити за време (`start_time < end_time`) и капацитет (`capacity > 0`).
+
+### 3. Relationships (Връзки)
+- Строги `FOREIGN KEYS` пазят релациите чисти.
+- `ON DELETE CASCADE` автоматично чисти регистрациите и нотификациите, ако студент или събитие изчезнат.
+- `ON DELETE SET NULL` на `organizer_id` гарантира, че събитието не се трие, дори ако организаторът си изтрие профила.
+
+---
+
+## Deliverable 4: Кратка презентационна схема (Database Slide)
+
+```text
+       [ Users ]
+          |
+          v
+   [ Registrations ]
+          |
+          v
+      [ Events ]
+          |
+          v
+ [ NotificationJobs ]
+          |
+          v
+ [ NotificationLogs ]
+```
+
+---
+
+## План за колаборация
+- **С Валери (✅ Уточнено)**: FIFO логиката е съгласувана – ще пазим твърдо `position` за стабилност на Frontend/QA, а самият ред се дефинира по `created_at`.
+- **С Павел**: Уточняване на интеграцията на `role` и `password_hash` в `users`.
+- **С Пламен**: Потвърждаване на преходите на `status` и изваждането на `capacity`.
+- **С Роберта**: Съгласуване на структурата на `payload` (JSONB) и типовете `event types`.
