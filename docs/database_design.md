@@ -99,6 +99,8 @@ CREATE TABLE events (
     end_time TIMESTAMP WITH TIME ZONE NOT NULL,
     organizer_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraint: Prevent invalid date ranges at the DB level
     CONSTRAINT chk_events_start_before_end CHECK (start_time < end_time)
 );
 
@@ -113,6 +115,15 @@ CREATE TABLE registrations (
     status VARCHAR(50) NOT NULL DEFAULT 'CONFIRMED' CHECK (status IN ('CONFIRMED', 'WAITLISTED', 'CANCELLED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     position INT
+    status VARCHAR(50) NOT NULL DEFAULT 'confirmed',
+
+    CONSTRAINT chk_registration_status CHECK (
+        status IN ('confirmed', 'waitlisted', 'cancelled')
+    ),
+    registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraint: A user can only register once per event
+    UNIQUE (user_id, event_id)
 );
 
 -- ==========================================
@@ -127,6 +138,34 @@ CREATE TABLE notification_jobs (
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
     scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL,
+    payload JSONB NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 3,
+    scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    failed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_notification_job_type CHECK (
+        type IN (
+            'RegistrationConfirmed',
+            'RegistrationWaitlisted',
+            'WaitlistPromoted',
+            'EventCancelled'
+        )
+    ),
+
+    CONSTRAINT chk_notification_job_status CHECK (
+        status IN (
+            'pending',
+            'processing',
+            'completed',
+            'failed'
+        )
+    )
 );
 
 -- ==========================================
@@ -134,11 +173,21 @@ CREATE TABLE notification_jobs (
 -- ==========================================
 CREATE TABLE notification_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
     job_id UUID NOT NULL REFERENCES notification_jobs(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL,
+
+    message TEXT,
     error_message TEXT,
-    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+
+    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_notification_log_status CHECK (
+        status IN ('success', 'failed')
+    )
 );
 
 -- ==========================================
@@ -149,6 +198,11 @@ CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_registrations_event_id ON registrations(event_id);
 CREATE INDEX idx_registrations_student_id ON registrations(student_id);
 CREATE INDEX idx_notification_jobs_polling ON notification_jobs(status, scheduled_for);
+CREATE INDEX idx_notification_jobs_user_id ON notification_jobs(user_id);
+CREATE INDEX idx_notification_jobs_event_id ON notification_jobs(event_id);
+CREATE INDEX idx_notification_jobs_registration_id ON notification_jobs(registration_id);
+CREATE INDEX idx_events_start_time ON events(start_time);
+CREATE INDEX idx_events_organizer_id ON events(organizer_id);
 
 -- ==========================================
 -- UNIQUE CONSTRAINTS (Ограничения)
