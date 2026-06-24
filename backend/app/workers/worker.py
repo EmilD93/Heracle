@@ -144,6 +144,58 @@ def send_notification(job):
 
     return message
 
+def run_worker_once(db):
+    """
+    Processes one pending notification job.
+
+    This is useful for testing the worker prototype without running
+    an infinite loop.
+    """
+
+    reset_stuck_jobs(db)
+
+    job = get_next_pending_job(db)
+
+    if job is None:
+        print("No pending notification jobs found.")
+        return None
+
+    try:
+        mark_job_processing(db, job["id"])
+
+        message = send_notification(job)
+
+        create_notification_log(
+            db=db,
+            job=job,
+            status="success",
+            message=message
+        )
+
+        mark_job_completed(db, job["id"])
+
+        print(f"Job {job['id']} completed.")
+        return job
+
+    except Exception as error:
+        error_message = str(error)
+
+        create_notification_log(
+            db=db,
+            job=job,
+            status="failed",
+            error_message=error_message
+        )
+
+        next_attempt_count = job["attempt_count"] + 1
+
+        if next_attempt_count >= job["max_attempts"]:
+            mark_job_failed(db, job["id"], error_message)
+        else:
+            retry_job(db, job["id"], error_message)
+
+        print(f"Job {job['id']} failed: {error_message}")
+        return job
 
 def run_worker(db):
     """
@@ -160,41 +212,5 @@ def run_worker(db):
     """
 
     while True:
-        reset_stuck_jobs(db)
-
-        job = get_next_pending_job(db)
-
-        if job is None:
-            time.sleep(5)
-            continue
-
-        try:
-            mark_job_processing(db, job["id"])
-
-            message = send_notification(job)
-
-            create_notification_log(
-                db=db,
-                job=job,
-                status="success",
-                message=message
-            )
-
-            mark_job_completed(db, job["id"])
-
-        except Exception as error:
-            error_message = str(error)
-
-            create_notification_log(
-                db=db,
-                job=job,
-                status="failed",
-                error_message=error_message
-            )
-
-            next_attempt_count = job["attempt_count"] + 1
-
-            if next_attempt_count >= job["max_attempts"]:
-                mark_job_failed(db, job["id"], error_message)
-            else:
-                retry_job(db, job["id"], error_message)
+        run_worker_once(db)
+        time.sleep(5)
