@@ -14,7 +14,11 @@ import { cn } from '../utils/cn'
 import { EVENTS } from '../data/events'
 import { RegistrationsChart } from './RegistrationsChart'
 
-export function OrganizerDashboard() {
+interface OrganizerDashboardProps {
+  onCreateEventClick: () => void
+}
+
+export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const stats = [
     {
       label: 'Total Events',
@@ -53,7 +57,9 @@ export function OrganizerDashboard() {
           </p>
         </div>
 
-        <button className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[1.25rem] font-bold text-[15px] shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-[0.98] focus:outline-none">
+        <button 
+        onClick={() => setActiveTab('create-event')}
+        className="flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[1.25rem] font-bold text-[15px] shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-[0.98] focus:outline-none">
           <Plus size={20} strokeWidth={2.5} />
           Create New Event
         </button>

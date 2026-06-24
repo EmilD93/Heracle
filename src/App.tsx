@@ -4,6 +4,8 @@ import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './components/Dashboard'
 import { EventDetails } from './components/EventDetails'
 import { OrganizerDashboard } from './components/OrganizerDashboard'
+import { MyEvents } from './components/MyEvents'
+import { CreateEventForm } from './components/CreateEventForm'
 import { useScreenInit } from './useScreenInit.js'
 
 export function App() {
@@ -15,7 +17,6 @@ export function App() {
     screenInit?.selectedEventId ?? null,
   )
   
-  // Нов Стейт за състоянието на страничното меню
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
 
   const handleTabChange = (tab: string) => {
@@ -25,7 +26,6 @@ export function App() {
 
   return (
     <div className="flex h-screen w-full bg-[#f1f5f9] p-4 gap-4 font-sans overflow-hidden">
-      {/* Подаваме състоянието и функцията за промяна на менюто */}
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={handleTabChange} 
@@ -51,9 +51,18 @@ export function App() {
               />
             )}
             {activeTab === 'organizer' && (
-              <OrganizerDashboard key="organizer" />
+              <OrganizerDashboard key="organizer" setActiveTab={handleTabChange} />
             )}
-            {activeTab !== 'dashboard' && activeTab !== 'organizer' && (
+            {activeTab === 'my-events' && (
+              <MyEvents key="my-events" />
+            )}
+            {activeTab === 'create-event' && (
+              <CreateEventForm 
+                key="create-event" 
+                onBack={() => handleTabChange('organizer')} // Sends user back to organizer view
+              />
+            )}
+            {activeTab !== 'dashboard' && activeTab !== 'organizer' && activeTab !== 'my-events' && activeTab !== 'create-event' && (
               <div
                 key="construction"
                 className="flex items-center justify-center h-full text-slate-400 flex-col gap-5"
