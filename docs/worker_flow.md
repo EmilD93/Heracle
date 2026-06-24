@@ -4,190 +4,223 @@
 
 The worker is responsible for processing notification jobs asynchronously.
 
-The API should stay fast.
-That means the API should not send emails or notifications directly.
+The backend API should stay fast, so it should not send emails or notifications directly during a user request. Instead, the API creates a row in the `notification_jobs` table with status `pending`.
 
-Instead, the API creates a row in the `notification_jobs` table.
-
-Then the worker reads pending jobs, processes them, and saves the result in `notification_logs`.
+The worker then reads pending jobs, processes them, writes the result to `notification_logs`, and updates the job status.
 
 ---
 
-## Chosen Architecture Pattern
+## Architecture Pattern
 
 This project uses the **Web-Queue-Worker Pattern**.
 
-The backend API handles incoming requests from the frontend and gives a fast response.
-
-Instead of sending notifications directly, the API creates a job in the `notification_jobs` table.
-
-The worker process runs separately in the background. It reads pending jobs, processes notifications, and saves the result in `notification_logs`.
-
-This keeps the API fast and separates user-facing work from background work.
+| Part | Responsibility |
+|---|---|
+| React Frontend | Sends user actions to the backend, such as event registration |
+| FastAPI Backend | Handles the request, updates the main tables, and creates notification jobs |
+| `notification_jobs` | Stores notification jobs waiting to be processed |
+| Worker Process | Reads pending jobs and processes notifications separately from the API |
+| `notification_logs` | Stores the result of each notification attempt |
 
 ---
 
-## Web-Queue-Worker Diagram
+## Related Files
 
-```text
-React Frontend
-      ↓
-FastAPI Backend
-      ↓
-Creates notification job
-      ↓
-notification_jobs table
-      ↓
-Worker Process
-      ↓
-Processes notification
-      ↓
-notification_logs table
-```
+| File | Purpose |
+|---|---|
+| `init.sql` | Defines the database tables, constraints, and indexes |
+| `backend/app/services/notification_service.py` | Creates rows in `notification_jobs` |
+| `backend/app/workers/worker.py` | Processes pending notification jobs |
+| `docs/database_design.md` | Documents the full database design |
+| `docs/worker_flow.md` | Explains how the worker and notification queue work |
 
 ---
 
 ## High-Level Flow
 
+```text
+Student registers for an event
+        ↓
+Backend saves or updates the registration
+        ↓
+Backend creates a notification job
+        ↓
+notification_jobs stores the job as pending
+        ↓
+Worker finds the pending job
+        ↓
+Worker marks the job as processing
+        ↓
+Worker prints or sends the notification
+        ↓
+Worker writes a notification log
+        ↓
+Worker marks the job as completed
+```
+
+---
+
+## Mermaid Flow Diagram
+
 ```mermaid
 flowchart TD
-    A[Student registers for event] --> B[Backend saves registration]
-    B --> C[Backend creates domain event]
-    C --> D[Backend inserts notification job]
-    D --> E[Worker reads pending job]
-    E --> F[Worker marks job as processing]
-    F --> G[Worker sends or prints notification]
-    G --> H[Worker writes notification log]
-    H --> I[Worker marks job as completed]
+    A[Student performs an action] --> B[FastAPI backend handles request]
+    B --> C[Backend updates main database tables]
+    C --> D[Backend calls notification_service.py]
+    D --> E[Insert pending row into notification_jobs]
+    E --> F[Worker reads oldest pending job]
+    F --> G[Worker marks job as processing]
+    G --> H[Worker processes notification payload]
+    H --> I[Worker writes row to notification_logs]
+    I --> J[Worker marks job as completed]
 ```
 
 ---
 
-## How This Matches Event-Driven Architecture
+## Tables Used by the Worker
 
-The registration system does not directly handle notifications.
+The worker mainly depends on two tables:
 
-Instead, something important happens first, such as:
+| Table | Purpose |
+|---|---|
+| `notification_jobs` | Queue of notification jobs waiting to be processed |
+| `notification_logs` | History of notification attempts and results |
 
-* a student is confirmed for an event
-* a student is added to the waitlist
-* a waitlisted student is promoted
-
-After that, the backend creates a **domain event** and inserts a notification job.
-
-The worker processes that job later.
-
-This means the notification logic is separated from the registration logic.
+The `users`, `events`, and `registrations` tables are also connected through foreign keys.
 
 ---
 
-## API, Queue, and Worker Responsibilities
+## `notification_jobs` Table
 
-| Part                | Responsibility                                     |
-| ------------------- | -------------------------------------------------- |
-| React Frontend      | Sends requests to the backend                      |
-| FastAPI Backend     | Handles registration and creates notification jobs |
-| `notification_jobs` | Stores pending background tasks                    |
-| Worker Process      | Reads and processes pending jobs                   |
-| `notification_logs` | Stores the result of processed notifications       |
+The `notification_jobs` table works as the queue.
 
----
+Each row is one notification task that the worker must process.
 
-## Tables Used
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID | Primary key for the notification job |
+| `user_id` | UUID | References the user who should receive the notification |
+| `event_id` | UUID | References the event related to the notification |
+| `registration_id` | UUID | References the registration related to the notification, if applicable |
+| `type` | VARCHAR(50) | Type of notification the worker should process |
+| `payload` | JSONB | Extra data needed to build the notification message |
+| `status` | VARCHAR(50) | Current job status: `pending`, `processing`, `completed`, or `failed` |
+| `attempt_count` | INT | Number of times the worker has tried to process the job |
+| `max_attempts` | INT | Maximum number of attempts before the job is marked as failed |
+| `scheduled_for` | TIMESTAMP WITH TIME ZONE | Time when the job is allowed to be processed |
+| `locked_at` | TIMESTAMP WITH TIME ZONE | Time when the worker locked the job for processing |
+| `completed_at` | TIMESTAMP WITH TIME ZONE | Time when the job was completed successfully |
+| `failed_at` | TIMESTAMP WITH TIME ZONE | Time when the job permanently failed |
+| `error_message` | TEXT | Error details if the job fails |
+| `created_at` | TIMESTAMP WITH TIME ZONE | Time when the job was created |
 
-### `notification_jobs`
+### SQL Schema
 
-This table works as the queue.
+```sql
+CREATE TABLE notification_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-It stores notification tasks that still need to be processed.
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    registration_id UUID REFERENCES registrations(id) ON DELETE SET NULL,
 
-Important columns:
+    type VARCHAR(50) NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
 
-| Column            | Purpose                                    |
-| ----------------- | ------------------------------------------ |
-| `id`              | Unique job ID                              |
-| `type`            | Type of notification                       |
-| `status`          | Current job status                         |
-| `user_id`         | User who should receive the notification   |
-| `event_id`        | Event related to the notification          |
-| `registration_id` | Registration related to the notification   |
-| `payload`         | Extra data needed by the worker            |
-| `attempt_count`   | Number of processing attempts              |
-| `max_attempts`    | Maximum allowed attempts                   |
-| `scheduled_for`   | When the job can be processed              |
-| `locked_at`       | When the worker started processing the job |
-| `completed_at`    | When the job finished successfully         |
-| `failed_at`       | When the job failed permanently            |
-| `error_message`   | Error details if the job fails             |
-| `created_at`      | When the job was created                   |
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
 
----
+    attempt_count INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 3,
 
-### `notification_logs`
+    scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    failed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
 
-This table stores the result of processed jobs.
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
-It is used to prove that the worker successfully processed the notification or that it failed.
+    CONSTRAINT chk_notification_job_type CHECK (
+        type IN (
+            'RegistrationConfirmed',
+            'RegistrationWaitlisted',
+            'WaitlistPromoted',
+            'EventCancelled'
+        )
+    ),
 
-Important columns:
-
-| Column          | Purpose                             |
-| --------------- | ----------------------------------- |
-| `id`            | Unique log ID                       |
-| `job_id`        | Related notification job            |
-| `user_id`       | User who received the notification  |
-| `type`          | Notification type                   |
-| `status`        | `success` or `failed`               |
-| `message`       | Notification message                |
-| `error_message` | Error details if processing failed  |
-| `sent_at`       | When the notification was processed |
-
----
-
-## Job Statuses
-
-A notification job can have one of these statuses:
-
-| Status       | Meaning                                |
-| ------------ | -------------------------------------- |
-| `pending`    | Job is waiting to be processed         |
-| `processing` | Worker is currently processing the job |
-| `completed`  | Job was processed successfully         |
-| `failed`     | Job failed after all retry attempts    |
-
----
-
-## Worker Job Lifecycle
-
-Successful job:
-
-```text
-pending
-   ↓
-processing
-   ↓
-completed
+    CONSTRAINT chk_notification_job_status CHECK (
+        status IN (
+            'pending',
+            'processing',
+            'completed',
+            'failed'
+        )
+    )
+);
 ```
 
-Failed job with no retries left:
+---
 
-```text
-pending
-   ↓
-processing
-   ↓
-failed
+## `notification_logs` Table
+
+The `notification_logs` table stores the result of each notification attempt.
+
+A log row proves that the worker processed a job successfully or records why it failed.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID | Primary key for the notification log |
+| `job_id` | UUID | References the notification job that was processed |
+| `user_id` | UUID | References the user who received the notification |
+| `type` | VARCHAR(50) | Type of notification that was processed |
+| `status` | VARCHAR(50) | Result of the attempt: `success` or `failed` |
+| `message` | TEXT | Message that was sent or printed by the worker |
+| `error_message` | TEXT | Error details if processing failed |
+| `sent_at` | TIMESTAMP WITH TIME ZONE | Time when the notification attempt was logged |
+
+### SQL Schema
+
+```sql
+CREATE TABLE notification_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    job_id UUID NOT NULL REFERENCES notification_jobs(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    type VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+
+    message TEXT,
+    error_message TEXT,
+
+    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_notification_log_status CHECK (
+        status IN ('success', 'failed')
+    )
+);
 ```
 
-Failed job with retries still available:
+---
 
-```text
-pending
-   ↓
-processing
-   ↓
-pending
-```
+## Notification Job Statuses
+
+| Status | Meaning |
+|---|---|
+| `pending` | The job is waiting to be processed |
+| `processing` | The worker has locked the job and is processing it |
+| `completed` | The job was processed successfully |
+| `failed` | The job failed after all retry attempts |
+
+---
+
+## Notification Log Statuses
+
+| Status | Meaning |
+|---|---|
+| `success` | The worker processed the notification successfully |
+| `failed` | The worker tried to process the notification, but an error happened |
 
 ---
 
@@ -195,12 +228,32 @@ pending
 
 The worker supports these notification types:
 
-| Type                     | When it happens                              |
-| ------------------------ | -------------------------------------------- |
-| `RegistrationConfirmed`  | Student successfully registers for an event  |
-| `RegistrationWaitlisted` | Event is full and student joins the waitlist |
-| `WaitlistPromoted`       | Waitlisted student is promoted to confirmed  |
-| `EventCancelled`         | Organizer cancels an event                   |
+| Type | When it happens |
+|---|---|
+| `RegistrationConfirmed` | A student successfully registers for an event |
+| `RegistrationWaitlisted` | An event is full and the student is added to the waitlist |
+| `WaitlistPromoted` | A waitlisted student is promoted to confirmed |
+| `EventCancelled` | An organizer cancels an event |
+
+---
+
+## Creating a Job
+
+The API creates a notification job after an important event happens.
+
+For example, after a student registers successfully, the backend creates a job like this:
+
+| Field | Example Value |
+|---|---|
+| `type` | `RegistrationConfirmed` |
+| `status` | `pending` |
+| `user_id` | Student user ID |
+| `event_id` | Related event ID |
+| `registration_id` | Related registration ID |
+| `payload` | Message and extra event data |
+| `scheduled_for` | Current time |
+
+The API does not send the notification itself. It only creates the job.
 
 ---
 
@@ -208,21 +261,21 @@ The worker supports these notification types:
 
 The worker repeats this process:
 
-1. Reset old stuck jobs.
-2. Find the oldest pending job.
-3. Lock the job so another worker cannot take it.
-4. Mark the job as `processing`.
-5. Read the job payload.
-6. Send or print the notification.
-7. Save a row in `notification_logs`.
-8. Mark the job as `completed`.
-9. If something fails, retry the job or mark it as `failed`.
+| Step | Action |
+|---|---|
+| 1 | Reset old stuck jobs from `processing` back to `pending` |
+| 2 | Find the oldest `pending` job where `scheduled_for <= NOW()` |
+| 3 | Lock the job using `FOR UPDATE SKIP LOCKED` |
+| 4 | Mark the job as `processing` |
+| 5 | Read the job `payload` |
+| 6 | Print or send the notification |
+| 7 | Insert a row into `notification_logs` |
+| 8 | Mark the job as `completed` |
+| 9 | If something fails, retry the job or mark it as `failed` |
 
 ---
 
-## SQL Query for Finding Jobs
-
-The worker should use this query to find the next job:
+## Query for Finding the Next Job
 
 ```sql
 SELECT *
@@ -234,138 +287,87 @@ LIMIT 1
 FOR UPDATE SKIP LOCKED;
 ```
 
-This query is useful because:
+This query is important because it prevents two workers from processing the same job at the same time.
 
-* it processes jobs in order
-* it prevents two workers from taking the same job
-* it allows multiple workers to run safely at the same time
-
----
-
-## Success Flow
-
-Example: a student registers successfully.
-
-```text
-Student registers
-↓
-Registration status becomes confirmed
-↓
-RegistrationConfirmed job is created
-↓
-Worker reads the job
-↓
-Worker marks the job as processing
-↓
-Worker sends or prints notification
-↓
-notification_logs gets success row
-↓
-notification_jobs status becomes completed
-```
-
-Example notification message:
-
-```text
-Your registration has been confirmed.
-```
+| Query Part | Why it matters |
+|---|---|
+| `status = 'pending'` | Only unprocessed jobs are selected |
+| `scheduled_for <= NOW()` | Future jobs are ignored until they are ready |
+| `ORDER BY created_at ASC` | Older jobs are processed first |
+| `LIMIT 1` | The worker processes one job at a time |
+| `FOR UPDATE SKIP LOCKED` | Prevents two workers from processing the same job |
 
 ---
 
-## Waitlist Flow
-
-Example: an event is full.
+## Successful Job Lifecycle
 
 ```text
-Student tries to register
-↓
-No available seats
-↓
-Registration status becomes waitlisted
-↓
-RegistrationWaitlisted job is created
-↓
-Worker reads the job
-↓
-Worker marks the job as processing
-↓
-Worker sends or prints notification
-↓
-notification_logs gets success row
-↓
-notification_jobs status becomes completed
+pending
+   ↓
+processing
+   ↓
+completed
 ```
 
-Example notification message:
+When the job succeeds:
 
-```text
-The event is full. You have been added to the waitlist.
-```
+| Step | Result |
+|---|---|
+| 1 | The worker creates a `notification_logs` row with status `success` |
+| 2 | The worker stores the generated notification in `message` |
+| 3 | The worker updates the job status to `completed` |
+| 4 | The worker sets `completed_at` |
 
 ---
 
-## Promotion Flow
-
-Example: a confirmed student cancels.
+## Failed Job Lifecycle With Retry
 
 ```text
-Confirmed student cancels
-↓
-First waitlisted student is selected
-↓
-Waitlisted student becomes confirmed
-↓
-WaitlistPromoted job is created
-↓
-Worker reads the job
-↓
-Worker marks the job as processing
-↓
-Worker sends or prints notification
-↓
-notification_logs gets success row
-↓
-notification_jobs status becomes completed
+pending
+   ↓
+processing
+   ↓
+pending
 ```
 
-Example notification message:
+When a job fails but still has attempts left:
 
-```text
-Good news! You have been promoted from the waitlist.
-```
+| Step | Result |
+|---|---|
+| 1 | The worker creates a `notification_logs` row with status `failed` |
+| 2 | The worker stores the error in `error_message` |
+| 3 | The worker increments `attempt_count` |
+| 4 | The worker sets the job status back to `pending` |
+| 5 | The worker can try again later |
 
 ---
 
-## Failure Handling
-
-If the worker fails while processing a job:
-
-1. The error is saved.
-2. `attempt_count` is increased.
-3. If attempts are still available, the job goes back to `pending`.
-4. If the maximum number of attempts is reached, the job becomes `failed`.
-5. A failed notification log is created.
-
-Example:
+## Failed Job Lifecycle With No Retries Left
 
 ```text
-Job fails
-↓
-attempt_count = attempt_count + 1
-↓
-If attempt_count < max_attempts → pending
-If attempt_count >= max_attempts → failed
+pending
+   ↓
+processing
+   ↓
+failed
 ```
 
-This makes the worker more reliable because temporary errors do not immediately lose the notification.
+When a job fails and reaches `max_attempts`:
+
+| Step | Result |
+|---|---|
+| 1 | The worker creates a `notification_logs` row with status `failed` |
+| 2 | The worker stores the error in `error_message` |
+| 3 | The worker marks the job as `failed` |
+| 4 | The worker sets `failed_at` |
 
 ---
 
-## Stuck Job Recovery
+## Resetting Stuck Jobs
 
-If the worker crashes while a job is `processing`, the job could get stuck.
+A job can get stuck in `processing` if the worker crashes while processing it.
 
-To fix this, old processing jobs can be reset back to `pending`.
+The worker resets old stuck jobs with this logic:
 
 ```sql
 UPDATE notification_jobs
@@ -375,79 +377,92 @@ WHERE status = 'processing'
   AND locked_at < NOW() - INTERVAL '10 minutes';
 ```
 
-This makes the system more reliable because jobs are not lost if the worker crashes.
+This makes the system safer because another worker can retry the job later.
 
 ---
 
-## Why We Use Web-Queue-Worker
+## Required Indexes
 
-We use Web-Queue-Worker because notifications are background tasks.
+These indexes help the worker and related queries stay fast:
 
-Sending notifications directly inside the API would make the request slower.
+```sql
+CREATE INDEX idx_notification_jobs_polling
+ON notification_jobs(status, scheduled_for);
 
-With this architecture:
+CREATE INDEX idx_notification_jobs_user_id
+ON notification_jobs(user_id);
 
-* the API stays fast
-* notification logic is separated from registration logic
-* failed jobs can be retried
-* notification history is stored in logs
-* the worker can be scaled separately later
+CREATE INDEX idx_notification_jobs_event_id
+ON notification_jobs(event_id);
 
----
-
-## Other Worker Models
-
-Other worker architectures exist, but they are not necessary for this project.
-
-### Master-Worker
-
-Master-Worker architecture is useful when a large task must be split into many smaller computational subtasks.
-
-This is not needed for our project because we are not doing heavy parallel computation.
-
-### Event-Driven Server Worker
-
-NGINX-style event-driven workers are useful for handling many network connections at the same time.
-
-This is also not needed for our project because our worker only needs to process notification jobs from a queue.
-
-For this system, the Web-Queue-Worker Pattern is the correct and simple solution.
-
----
-
-## Demo Scenario
-
-For the final project demo, we can show this scenario:
-
-```text
-Event capacity = 3
-
-Student A registers → confirmed
-Student B registers → confirmed
-Student C registers → confirmed
-Student D registers → waitlisted
-
-Student B cancels
-
-Expected result:
-Student D becomes confirmed
-WaitlistPromoted job is created
-Worker processes the job
-notification_logs shows success
+CREATE INDEX idx_notification_jobs_registration_id
+ON notification_jobs(registration_id);
 ```
 
+The most important index for the worker is `idx_notification_jobs_polling` because the worker constantly searches by `status` and `scheduled_for`.
+
 ---
 
-## Short Explanation for Presentation
+## Example End-to-End Scenario
 
-My module handles what happens after an important action occurs.
+### Scenario: Student registers successfully
 
-The backend creates notification jobs instead of sending notifications directly.
+| Step | What happens |
+|---|---|
+| 1 | A student clicks register in the frontend |
+| 2 | The backend creates a row in `registrations` with status `CONFIRMED` |
+| 3 | The backend creates a row in `notification_jobs` with type `RegistrationConfirmed` and status `pending` |
+| 4 | The worker finds that pending job |
+| 5 | The worker marks the job as `processing` |
+| 6 | The worker reads the payload and prints the notification message |
+| 7 | The worker writes a `notification_logs` row with status `success` |
+| 8 | The worker marks the job as `completed` |
 
-The `notification_jobs` table acts as a queue.
+### Final Result
 
-The worker runs separately in the background and processes pending jobs.
+| Table | Result |
+|---|---|
+| `registrations` | Student is registered for the event |
+| `notification_jobs` | Job status is `completed` |
+| `notification_logs` | Success log exists for the processed notification |
 
-The result is saved in `notification_logs`.
+---
 
-This makes the API faster, separates responsibilities, and gives us logs that prove each notification was processed.
+## Why This Counts as Event-Driven Design
+
+The registration logic does not directly send notifications.
+
+Instead:
+
+| Step | Description |
+|---|---|
+| 1 | A business event happens, such as a confirmed registration |
+| 2 | The backend records a notification job |
+| 3 | The worker reacts to that job later |
+
+This separates the main application logic from background processing and makes the system easier to extend later.
+
+---
+
+## Completion Checklist
+
+Task 1, `notification_jobs` table model, is complete when:
+
+| Requirement | Done when |
+|---|---|
+| Job table exists | `notification_jobs` is defined in `init.sql` |
+| Queue fields exist | The table has `status`, `scheduled_for`, `locked_at`, and `created_at` |
+| Retry fields exist | The table has `attempt_count`, `max_attempts`, and `error_message` |
+| Relationships exist | The table references `users`, `events`, and `registrations` |
+| Worker index exists | `idx_notification_jobs_polling` exists |
+
+Task 2, Worker Prototype, is complete when:
+
+| Requirement | Done when |
+|---|---|
+| Worker can find jobs | It selects pending jobs from `notification_jobs` |
+| Worker can lock jobs | It marks a job as `processing` and sets `locked_at` |
+| Worker can process jobs | It reads the payload and prints or sends the notification |
+| Worker can log results | It inserts rows into `notification_logs` |
+| Worker can finish jobs | It marks successful jobs as `completed` |
+| Worker can handle errors | It retries jobs or marks them as `failed` |
