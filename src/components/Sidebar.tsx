@@ -75,7 +75,7 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }
           "font-extrabold text-2xl text-slate-800 tracking-tight transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap block",
           isCollapsed ? "opacity-0 max-w-0 pointer-events-none" : "opacity-100 max-w-[200px]"
         )}>
-          Campus
+          Heracle
         </span>
       </div>
 

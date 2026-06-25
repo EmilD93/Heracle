@@ -6,17 +6,21 @@ import { EventDetails } from './components/EventDetails'
 import { OrganizerDashboard } from './components/OrganizerDashboard'
 import { MyEvents } from './components/MyEvents'
 import { CreateEventForm } from './components/CreateEventForm'
+import { LoginPage } from './components/Loginpage.tsx'
+import { RegisterPage } from './components/RegisterPage'
 import { useScreenInit } from './useScreenInit.js'
+
+type AuthScreen = 'login' | 'register' | 'app'
 
 export function App() {
   const screenInit = useScreenInit()
+  const [authScreen, setAuthScreen] = useState<AuthScreen>('login')
   const [activeTab, setActiveTab] = useState<string>(
     screenInit?.activeTab ?? 'dashboard',
   )
   const [selectedEventId, setSelectedEventId] = useState<number | null>(
     screenInit?.selectedEventId ?? null,
   )
-  
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
 
   const handleTabChange = (tab: string) => {
@@ -24,11 +28,29 @@ export function App() {
     setSelectedEventId(null)
   }
 
+  if (authScreen === 'login') {
+    return (
+      <LoginPage
+        onLogin={() => setAuthScreen('app')}
+        onNavigateToRegister={() => setAuthScreen('register')}
+      />
+    )
+  }
+
+  if (authScreen === 'register') {
+    return (
+      <RegisterPage
+        onRegister={() => setAuthScreen('app')}
+        onNavigateToLogin={() => setAuthScreen('login')}
+      />
+    )
+  }
+
   return (
     <div className="flex h-screen w-full bg-[#f1f5f9] p-4 gap-4 font-sans overflow-hidden">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={handleTabChange} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
       />
@@ -57,9 +79,9 @@ export function App() {
               <MyEvents key="my-events" />
             )}
             {activeTab === 'create-event' && (
-              <CreateEventForm 
-                key="create-event" 
-                onBack={() => handleTabChange('organizer')} // Sends user back to organizer view
+              <CreateEventForm
+                key="create-event"
+                onBack={() => handleTabChange('organizer')}
               />
             )}
             {activeTab !== 'dashboard' && activeTab !== 'organizer' && activeTab !== 'my-events' && activeTab !== 'create-event' && (
