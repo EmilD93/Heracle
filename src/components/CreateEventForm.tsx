@@ -155,7 +155,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
   // Helper to parse date/time back to form format
   let initDate = ''
   let initStart = ''
-  if (existingEvent) {
+  if (existingEvent && typeof existingEvent.date === 'string') {
     const parts = existingEvent.date.split('•')
     if (parts.length > 0) {
       const d = new Date(parts[0].trim())
@@ -186,9 +186,9 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
     capacity: existingEvent?.capacity ? String(existingEvent.capacity) : '',
     description: existingEvent?.description || '',
     imageUrl: existingEvent?.image || '',
-    agenda: existingEvent?.agenda?.length 
-      ? existingEvent.agenda.map(a => ({ id: crypto.randomUUID(), time: a.time, activity: a.activity }))
-      : [{ id: crypto.randomUUID(), time: '', activity: '' }],
+    agenda: (existingEvent?.agenda && Array.isArray(existingEvent.agenda) && existingEvent.agenda.length > 0)
+      ? existingEvent.agenda.map(a => ({ id: Math.random().toString(36).substring(2), time: a.time || '', activity: a.activity || '' }))
+      : [{ id: Math.random().toString(36).substring(2), time: '', activity: '' }],
   })
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'draft' } | null>(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -203,7 +203,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
   const addAgendaItem = () =>
     setForm((f) => ({
       ...f,
-      agenda: [...f.agenda, { id: crypto.randomUUID(), time: '', activity: '' }],
+      agenda: [...f.agenda, { id: Math.random().toString(36).substring(2), time: '', activity: '' }],
     }))
 
   const removeAgendaItem = (id: string) =>
@@ -294,7 +294,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
   }
 
   // Live preview image
-  const previewImage = (form.imageUrl.startsWith('http') || form.imageUrl.startsWith('blob:') || form.imageUrl.startsWith('data:')) ? form.imageUrl : null
+  const previewImage = (form.imageUrl?.startsWith('http') || form.imageUrl?.startsWith('blob:') || form.imageUrl?.startsWith('data:')) ? form.imageUrl : null
 
   return (
     <>
