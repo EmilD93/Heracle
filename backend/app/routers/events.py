@@ -41,10 +41,10 @@ def get_events(db = Depends(get_db)):
             "date": f"{start_t} • {start_h}",
             "capacity": row['capacity'],
             "registered": row['registered'],
-            "category": "Academic", # using fixed category until added to DB schema
+            "category": row.get('category') or "Academic",
             "status": "Published" if row['status'] == 'PUBLISHED' else "Draft",
-            "location": "Main Campus", # using fixed location until added to DB schema
-            "image": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000",
+            "location": row.get('location') or "Main Campus",
+            "image": row.get('image') or "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000",
             "organizer": {
                 "name": f"{row['first_name']} {row['last_name']}",
                 "email": row['org_email'],
@@ -56,24 +56,24 @@ def get_events(db = Depends(get_db)):
 
 @router.post("/")
 def create_event(event: EventCreate, db = Depends(get_db)):
-    # Quick fix for string to date mapping
-    # Assuming start_time and end_time are required by DB, we mock end_time
-    import datetime
     try:
         user = db.execute("SELECT id FROM users WHERE email = %s", (event.createdBy,)).fetchone()
         if not user:
             raise HTTPException(status_code=400, detail="User not found")
             
         res = db.execute("""
-            INSERT INTO events (title, description, capacity, status, start_time, end_time, organizer_id)
-            VALUES (%s, %s, %s, %s, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours', %s)
+            INSERT INTO events (title, description, capacity, status, start_time, end_time, organizer_id, image, location, category)
+            VALUES (%s, %s, %s, %s, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours', %s, %s, %s, %s)
             RETURNING id
         """, (
             event.title, 
             event.description, 
             event.capacity, 
             "PUBLISHED" if event.status == "Published" else "DRAFT",
-            user['id']
+            user['id'],
+            event.image,
+            event.location,
+            event.category
         ))
         return {"id": str(res.fetchone()['id'])}
     except Exception as e:

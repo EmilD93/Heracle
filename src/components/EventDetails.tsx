@@ -36,9 +36,9 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
   const isFull = registered >= event.capacity
   const percentage = Math.min(100, (registered / event.capacity) * 100)
 
-  const handleAction = () => {
+  const handleAction = async () => {
     if (status !== 'idle') return
-    const result = registerForEvent(userEmail, eventId)
+    const result = await registerForEvent(userEmail, eventId)
     if (!result.ok) return
 
     if (result.registration.status === 'CONFIRMED') {

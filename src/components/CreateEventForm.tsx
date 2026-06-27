@@ -233,15 +233,15 @@ export function CreateEventForm({ onBack, userEmail }: CreateEventFormProps) {
     }
   }
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!validate()) return
-    createEvent(buildEventData('Published'))
+    await createEvent(buildEventData('Published'))
     showToast('Event published!', 'success')
     setTimeout(() => onBack(), 1200)
   }
 
-  const handleSaveDraft = () => {
-    createEvent(buildEventData('Draft'))
+  const handleSaveDraft = async () => {
+    await createEvent(buildEventData('Draft'))
     showToast('Saved as draft', 'draft')
     setTimeout(() => onBack(), 1200)
   }

@@ -39,10 +39,10 @@ export function EventCard({
   )
   const isFull = registered >= capacity
   const percentage = Math.min(100, (registered / capacity) * 100)
-  const handleAction = (e: React.MouseEvent) => {
+  const handleAction = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (status !== 'idle' || !userEmail) return
-    const result = registerForEvent(userEmail, id)
+    const result = await registerForEvent(userEmail, id)
     if (!result.ok) return
 
     if (result.registration.status === 'CONFIRMED') {
