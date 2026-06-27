@@ -95,7 +95,7 @@ export function App() {
         <div className="relative z-10 h-full flex flex-col">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && !selectedEventId && (
-              <Dashboard key={`dashboard-${refreshKey}`} onEventSelect={setSelectedEventId} />
+              <Dashboard key={`dashboard-${refreshKey}`} userEmail={userEmail} onEventSelect={setSelectedEventId} onDataChange={refresh} />
             )}
             {activeTab === 'dashboard' && selectedEventId && (
               <EventDetails
