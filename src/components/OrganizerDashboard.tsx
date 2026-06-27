@@ -184,7 +184,7 @@ export function OrganizerDashboard({ setActiveTab, onDataChange, onEditEvent }: 
                         </div>
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-2 transition-opacity">
                           {event.status === 'Draft' && (
                             <button
                               onClick={() => handlePublish(event.id)}
