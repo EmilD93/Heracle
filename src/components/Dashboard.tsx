@@ -5,8 +5,6 @@ import { Bell, Search, SlidersHorizontal } from 'lucide-react'
 import { cn } from '../utils/cn'
 import { getAllEvents } from '../dataStore'
 
-const EVENTS = getAllEvents()
-
 const FILTERS = [
   'All Events',
   'Academic',
@@ -21,6 +19,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onEventSelect }: DashboardProps) {
+  const EVENTS = getAllEvents()
   const [activeFilter, setActiveFilter] = useState<string>('All Events')
   const [query, setQuery] = useState('')
 

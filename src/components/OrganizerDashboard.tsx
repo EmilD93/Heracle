@@ -14,13 +14,12 @@ import { cn } from '../utils/cn'
 import { getAllEvents } from '../dataStore'
 import { RegistrationsChart } from './RegistrationsChart'
 
-const EVENTS = getAllEvents()
-
 interface OrganizerDashboardProps {
   onCreateEventClick: () => void
 }
 
 export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const EVENTS = getAllEvents()
   const totalRegs = EVENTS.reduce((sum, e) => sum + e.registered, 0)
   const stats = [
     {
