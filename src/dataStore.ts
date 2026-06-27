@@ -138,6 +138,12 @@ export function getRegistrationsForEvent(eventId: string): Registration[] {
   )
 }
 
+export function getUserRegistrationForEvent(userEmail: string, eventId: string | number): Registration | undefined {
+  return getAllRegistrations().find(
+    r => r.userEmail === userEmail && String(r.eventId) === String(eventId) && r.status !== 'CANCELLED'
+  )
+}
+
 export function cancelRegistration(userEmail: string, eventId: number) {
   const allRegs = getAllRegistrations()
   const idx = allRegs.findIndex(
