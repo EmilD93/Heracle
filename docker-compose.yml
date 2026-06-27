@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: heracle_user
+      POSTGRES_PASSWORD: heracle_password
+      POSTGRES_DB: heracle_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # This will automatically run init.sql then seed.sql when creating the container
+      - ./init.sql:/docker-entrypoint-initdb.d/1-init.sql
+      - ./seed.sql:/docker-entrypoint-initdb.d/2-seed.sql
+
+volumes:
+  postgres_data:
