@@ -339,10 +339,10 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
         <div className="flex items-start gap-3 mb-10">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-800 tracking-tight mb-2">
-              Create New Event
+              {eventIdToEdit ? 'Edit Event' : 'Create New Event'}
             </h1>
             <p className="text-slate-500 font-semibold text-lg">
-              Fill in the details and publish when ready
+              {eventIdToEdit ? 'Update your event details' : 'Fill in the details and publish when ready'}
             </p>
           </div>
         </div>
