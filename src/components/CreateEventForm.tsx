@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { createEvent } from '../dataStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,9 +145,10 @@ function Toast({ message, type }: { message: string; type: 'success' | 'draft' }
 
 interface CreateEventFormProps {
   onBack: () => void
+  userEmail: string
 }
 
-export function CreateEventForm({ onBack }: CreateEventFormProps) {
+export function CreateEventForm({ onBack, userEmail }: CreateEventFormProps) {
   const [form, setForm] = useState<FormState>({
     title: '',
     category: '',
@@ -201,17 +203,59 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
     setTimeout(() => setToast(null), 3000)
   }
 
+  const buildEventData = (status: 'Published' | 'Draft') => {
+    const dateFormatted = form.date
+      ? new Date(form.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : ''
+    const timeStr = form.startTime
+      ? `${form.startTime}${form.endTime ? ' – ' + form.endTime : ''}`
+      : ''
+    const dateDisplay = dateFormatted + (timeStr ? ` • ${timeStr}` : '')
+
+    return {
+      title: form.title,
+      description: form.description,
+      date: dateDisplay,
+      image: form.imageUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000',
+      capacity: Number(form.capacity) || 100,
+      category: form.category,
+      status,
+      location: form.location,
+      organizer: {
+        name: userEmail.split('@')[0],
+        email: userEmail,
+        phone: '',
+      },
+      agenda: form.agenda
+        .filter(a => a.time || a.activity)
+        .map(a => ({ time: a.time, activity: a.activity })),
+      createdBy: userEmail,
+    }
+  }
+
   const handlePublish = () => {
     if (!validate()) return
+    createEvent(buildEventData('Published'))
     showToast('Event published!', 'success')
+    setTimeout(() => onBack(), 1200)
   }
 
   const handleSaveDraft = () => {
+    createEvent(buildEventData('Draft'))
     showToast('Saved as draft', 'draft')
+    setTimeout(() => onBack(), 1200)
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const url = URL.createObjectURL(file)
+      set('imageUrl', url)
+    }
   }
 
   // Live preview image
-  const previewImage = form.imageUrl.startsWith('http') ? form.imageUrl : null
+  const previewImage = (form.imageUrl.startsWith('http') || form.imageUrl.startsWith('blob:') || form.imageUrl.startsWith('data:')) ? form.imageUrl : null
 
   return (
     <>
@@ -304,7 +348,7 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
                           initial={{ opacity: 0, y: -8 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -8 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-900/10 z-20 overflow-hidden"
+                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-900/10 z-20 overflow-hidden max-h-48 overflow-y-auto"
                         >
                           {CATEGORIES.map((cat) => (
                             <button
@@ -443,19 +487,42 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
 
             {/* Cover image */}
             <Section icon={ImageIcon} title="Cover Image" color="amber">
-              <div>
-                <Label>Image URL</Label>
-                <Input
-                  placeholder="https://images.unsplash.com/..."
-                  value={form.imageUrl}
-                  onChange={(e) => set('imageUrl', e.target.value)}
-                />
-                <p className="mt-2 text-xs font-medium text-slate-400">
-                  Paste a direct image link to preview below.
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <Label>Upload Photo</Label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="block w-full text-sm text-slate-500
+                      file:mr-4 file:py-2.5 file:px-5
+                      file:rounded-[1rem] file:border-0
+                      file:text-sm file:font-bold
+                      file:bg-amber-50 file:text-amber-700
+                      hover:file:bg-amber-100 transition-all cursor-pointer"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 border-t border-slate-100"></div>
+                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">or</span>
+                  <div className="flex-1 border-t border-slate-100"></div>
+                </div>
+
+                <div>
+                  <Label>Image URL</Label>
+                  <Input
+                    placeholder="https://images.unsplash.com/..."
+                    value={form.imageUrl}
+                    onChange={(e) => set('imageUrl', e.target.value)}
+                  />
+                  <p className="mt-2 text-xs font-medium text-slate-400">
+                    Paste a direct image link or upload a file to preview below.
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-4 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center transition-all">
+              <div className="mt-5 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center transition-all">
                 {previewImage ? (
                   <img
                     src={previewImage}

@@ -11,30 +11,33 @@ import {
   Clock,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { EVENTS } from '../data/events'
+import { getAllEvents } from '../dataStore'
 import { RegistrationsChart } from './RegistrationsChart'
+
+const EVENTS = getAllEvents()
 
 interface OrganizerDashboardProps {
   onCreateEventClick: () => void
 }
 
 export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const totalRegs = EVENTS.reduce((sum, e) => sum + e.registered, 0)
   const stats = [
     {
       label: 'Total Events',
-      value: '12',
+      value: String(EVENTS.length),
       icon: Calendar,
       color: 'blue',
     },
     {
       label: 'Total Registrations',
-      value: '3,450',
+      value: totalRegs.toLocaleString(),
       icon: Users,
       color: 'emerald',
     },
     {
-      label: 'Waitlisted',
-      value: '128',
+      label: 'Full Events',
+      value: String(EVENTS.filter(e => e.registered >= e.capacity).length),
       icon: TrendingUp,
       color: 'amber',
     },

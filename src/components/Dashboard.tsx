@@ -3,7 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { EventCard } from './EventCard'
 import { Bell, Search, SlidersHorizontal } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { EVENTS } from '../data/events'
+import { getAllEvents } from '../dataStore'
+
+const EVENTS = getAllEvents()
 
 const FILTERS = [
   'All Events',

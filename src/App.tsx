@@ -9,12 +9,18 @@ import { CreateEventForm } from './components/CreateEventForm'
 import { LoginPage } from './components/Loginpage.tsx'
 import { RegisterPage } from './components/RegisterPage'
 import { useScreenInit } from './useScreenInit.js'
+import { initializeDataStore } from './dataStore'
+import type { UserAccount } from './authStore'
+
+// Initialize the data store with seed data on first load
+initializeDataStore()
 
 type AuthScreen = 'login' | 'register' | 'app'
 
 export function App() {
   const screenInit = useScreenInit()
   const [authScreen, setAuthScreen] = useState<AuthScreen>('login')
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null)
   const [activeTab, setActiveTab] = useState<string>(
     screenInit?.activeTab ?? 'dashboard',
   )
@@ -23,15 +29,36 @@ export function App() {
   )
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
 
+  // Force re-render key — incremented when data changes (e.g. new event created, registration)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refresh = () => setRefreshKey(k => k + 1)
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
+    setSelectedEventId(null)
+  }
+
+  const handleLogin = (user: UserAccount) => {
+    setCurrentUser(user)
+    setAuthScreen('app')
+  }
+
+  const handleRegister = (user: UserAccount) => {
+    setCurrentUser(user)
+    setAuthScreen('app')
+  }
+
+  const handleLogout = () => {
+    setCurrentUser(null)
+    setAuthScreen('login')
+    setActiveTab('dashboard')
     setSelectedEventId(null)
   }
 
   if (authScreen === 'login') {
     return (
       <LoginPage
-        onLogin={() => setAuthScreen('app')}
+        onLogin={handleLogin}
         onNavigateToRegister={() => setAuthScreen('register')}
       />
     )
@@ -40,11 +67,13 @@ export function App() {
   if (authScreen === 'register') {
     return (
       <RegisterPage
-        onRegister={() => setAuthScreen('app')}
+        onRegister={handleRegister}
         onNavigateToLogin={() => setAuthScreen('login')}
       />
     )
   }
+
+  const userEmail = currentUser?.email ?? ''
 
   return (
     <div className="flex h-screen w-full bg-[#f1f5f9] p-4 gap-4 font-sans overflow-hidden">
@@ -53,6 +82,9 @@ export function App() {
         setActiveTab={handleTabChange}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
+        userName={currentUser?.fullName ?? 'Guest'}
+        userRole={currentUser?.role ?? 'student'}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 bg-white/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/60 shadow-sm overflow-hidden relative flex flex-col">
@@ -63,25 +95,28 @@ export function App() {
         <div className="relative z-10 h-full flex flex-col">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && !selectedEventId && (
-              <Dashboard key="dashboard" onEventSelect={setSelectedEventId} />
+              <Dashboard key={`dashboard-${refreshKey}`} onEventSelect={setSelectedEventId} />
             )}
             {activeTab === 'dashboard' && selectedEventId && (
               <EventDetails
-                key="details"
+                key={`details-${selectedEventId}-${refreshKey}`}
                 eventId={selectedEventId}
+                userEmail={userEmail}
                 onBack={() => setSelectedEventId(null)}
+                onDataChange={refresh}
               />
             )}
             {activeTab === 'organizer' && (
-              <OrganizerDashboard key="organizer" setActiveTab={handleTabChange} />
+              <OrganizerDashboard key={`organizer-${refreshKey}`} setActiveTab={handleTabChange} />
             )}
             {activeTab === 'my-events' && (
-              <MyEvents key="my-events" />
+              <MyEvents key={`my-events-${refreshKey}`} userEmail={userEmail} />
             )}
             {activeTab === 'create-event' && (
               <CreateEventForm
                 key="create-event"
-                onBack={() => handleTabChange('organizer')}
+                userEmail={userEmail}
+                onBack={() => { refresh(); handleTabChange('organizer') }}
               />
             )}
             {activeTab !== 'dashboard' && activeTab !== 'organizer' && activeTab !== 'my-events' && activeTab !== 'create-event' && (

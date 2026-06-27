@@ -2,9 +2,11 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, User, ArrowRight, Check, Briefcase } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { registerUser } from '../authStore'
+import type { UserAccount } from '../authStore'
 
 interface RegisterPageProps {
-  onRegister: () => void
+  onRegister: (user: UserAccount) => void
   onNavigateToLogin: () => void
 }
 
@@ -45,6 +47,7 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
   const [agreed, setAgreed] = useState(false)
+  const [registerError, setRegisterError] = useState<string | null>(null)
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -80,10 +83,22 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
     const errs = validateStep(2)
     if (Object.keys(errs).length) { setErrors(errs); return }
     if (!agreed) return
+    setRegisterError(null)
     setIsLoading(true)
-    await new Promise(r => setTimeout(r, 1200))
+    await new Promise(r => setTimeout(r, 800))
+    const newUser: UserAccount = {
+      fullName: form.fullName,
+      email: form.email,
+      password: form.password,
+      role: form.role,
+    }
+    const result = registerUser(newUser)
     setIsLoading(false)
-    onRegister()
+    if (!result.ok) {
+      setRegisterError(result.error)
+      return
+    }
+    onRegister(newUser)
   }
 
   const passwordStrength = PASSWORD_RULES.filter(r => r.test(form.password)).length
@@ -219,6 +234,15 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
           </div>
 
           <form onSubmit={handleSubmit} noValidate>
+            {registerError && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 border border-red-200 rounded-[0.9rem] px-4 py-3 text-sm font-semibold text-red-600 mb-4"
+              >
+                {registerError}
+              </motion.div>
+            )}
             <AnimatedStep show={step === 0}>
               <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-1.5">Create account</h1>
               <p className="text-slate-500 font-medium text-[15px] mb-8">How will you use Campus?</p>

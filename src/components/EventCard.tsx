@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Calendar, Check, Clock } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { getEventById } from '../dataStore'
 interface EventCardProps {
   id: number
   title: string
@@ -24,7 +25,8 @@ export function EventCard({
   category,
   onSelect,
 }: EventCardProps) {
-  const [registered, setRegistered] = useState(initialRegistered)
+  const currentEvent = getEventById(id)
+  const [registered, setRegistered] = useState(currentEvent?.registered ?? initialRegistered)
   const [status, setStatus] = useState<'idle' | 'registered' | 'waitlisted'>(
     'idle',
   )

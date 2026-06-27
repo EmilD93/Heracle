@@ -2,9 +2,11 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { loginUser } from '../authStore'
+import type { UserAccount } from '../authStore'
 
 interface LoginPageProps {
-  onLogin: () => void
+  onLogin: (user: UserAccount) => void
   onNavigateToRegister: () => void
 }
 
@@ -21,6 +23,7 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+  const [loginError, setLoginError] = useState<string | null>(null)
 
   const validate = () => {
     const e: { email?: string; password?: string } = {}
@@ -36,10 +39,16 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
+    setLoginError(null)
     setIsLoading(true)
-    await new Promise(r => setTimeout(r, 1000))
+    await new Promise(r => setTimeout(r, 600))
+    const result = loginUser(email, password)
     setIsLoading(false)
-    onLogin()
+    if (!result.ok) {
+      setLoginError(result.error)
+      return
+    }
+    onLogin(result.user)
   }
 
   return (
@@ -130,6 +139,15 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
           </p>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            {loginError && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 border border-red-200 rounded-[0.9rem] px-4 py-3 text-sm font-semibold text-red-600"
+              >
+                {loginError}
+              </motion.div>
+            )}
             {/* Email */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>

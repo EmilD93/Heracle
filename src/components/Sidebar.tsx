@@ -1,4 +1,3 @@
-import React from 'react'
 import {
   LayoutDashboard,
   Ticket,
@@ -7,6 +6,7 @@ import {
   GraduationCap,
   Briefcase,
   ChevronLeft,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
 
@@ -43,9 +43,12 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void
   isCollapsed: boolean
   setIsCollapsed: (collapsed: boolean) => void
+  userName: string
+  userRole: 'student' | 'organizer'
+  onLogout: () => void
 }
 
-export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, userName, userRole, onLogout }: SidebarProps) {
   return (
     <aside 
       className={cn(
@@ -125,29 +128,46 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }
       </nav>
 
       <div className={cn(
-        "relative z-10 mt-auto rounded-[1.5rem] transition-all duration-500 ease-in-out w-full flex items-center",
+        "relative z-10 mt-auto rounded-[1.5rem] transition-all duration-500 ease-in-out w-full flex flex-col items-center gap-2",
         isCollapsed 
-          ? "p-0 bg-transparent border-transparent justify-center" 
-          : "bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 border border-slate-100/80 justify-start"
+          ? "p-0 bg-transparent border-transparent" 
+          : "bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 border border-slate-100/80"
       )}>
         <div className={cn("flex items-center transition-all duration-500 ease-in-out w-full", isCollapsed ? "justify-center gap-0" : "justify-start gap-3.5")}>
-          <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150&h=150"
-            alt="User"
-            className="w-11 h-11 rounded-full border-2 border-white shadow-sm object-cover shrink-0"
-          />
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+            {userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          </div>
           <div className={cn(
-            "flex flex-col text-left transition-all duration-500 ease-in-out overflow-hidden",
+            "flex flex-col text-left transition-all duration-500 ease-in-out overflow-hidden flex-1 min-w-0",
             isCollapsed ? "opacity-0 max-w-0 pointer-events-none" : "opacity-100 max-w-[200px]"
           )}>
-            <span className="text-sm font-bold text-slate-800 whitespace-nowrap">
-              Alex Johnson
+            <span className="text-sm font-bold text-slate-800 whitespace-nowrap truncate">
+              {userName}
             </span>
-            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
-              Computer Science
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap capitalize">
+              {userRole}
             </span>
           </div>
+          <button
+            onClick={onLogout}
+            title="Sign out"
+            className={cn(
+              "shrink-0 w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer outline-none focus:outline-none",
+              isCollapsed ? "hidden" : ""
+            )}
+          >
+            <LogOut size={16} strokeWidth={2.5} />
+          </button>
         </div>
+        {isCollapsed && (
+          <button
+            onClick={onLogout}
+            title="Sign out"
+            className="w-10 h-10 rounded-[0.75rem] flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer outline-none focus:outline-none"
+          >
+            <LogOut size={16} strokeWidth={2.5} />
+          </button>
+        )}
       </div>
     </aside>
   )
