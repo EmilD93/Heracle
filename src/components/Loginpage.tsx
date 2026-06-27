@@ -42,7 +42,7 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
     setLoginError(null)
     setIsLoading(true)
     await new Promise(r => setTimeout(r, 600))
-    const result = loginUser(email, password)
+    const result = await loginUser(email, password)
     setIsLoading(false)
     if (!result.ok) {
       setLoginError(result.error)

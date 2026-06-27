@@ -92,7 +92,7 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
       password: form.password,
       role: form.role,
     }
-    const result = registerUser(newUser)
+    const result = await registerUser(newUser)
     setIsLoading(false)
     if (!result.ok) {
       setRegisterError(result.error)
