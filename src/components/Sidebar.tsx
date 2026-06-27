@@ -84,6 +84,7 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
 
       <nav className="relative z-10 flex-1 space-y-2.5 w-full flex flex-col items-center">
         {navItems.map((item) => {
+          if (item.id === 'organizer' && userRole === 'student') return null
           const Icon = item.icon
           const isActive = activeTab === item.id
           return (

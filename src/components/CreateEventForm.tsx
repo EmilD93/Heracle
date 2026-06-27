@@ -146,20 +146,49 @@ function Toast({ message, type }: { message: string; type: 'success' | 'draft' }
 interface CreateEventFormProps {
   onBack: () => void
   userEmail: string
+  eventIdToEdit?: string
 }
 
-export function CreateEventForm({ onBack, userEmail }: CreateEventFormProps) {
+export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEventFormProps) {
+  const existingEvent = eventIdToEdit ? getEventById(eventIdToEdit) : null
+
+  // Helper to parse date/time back to form format
+  let initDate = ''
+  let initStart = ''
+  if (existingEvent) {
+    const parts = existingEvent.date.split('•')
+    if (parts.length > 0) {
+      const d = new Date(parts[0].trim())
+      if (!isNaN(d.getTime())) initDate = d.toISOString().split('T')[0]
+    }
+    if (parts.length > 1) {
+      const t = parts[1].trim()
+      // very basic conversion from "06:45 PM" to "18:45"
+      const timeMatch = t.match(/(\d+):(\d+)\s*(AM|PM)/i)
+      if (timeMatch) {
+        let hrs = parseInt(timeMatch[1], 10)
+        const mins = timeMatch[2]
+        const ampm = timeMatch[3].toUpperCase()
+        if (ampm === 'PM' && hrs < 12) hrs += 12
+        if (ampm === 'AM' && hrs === 12) hrs = 0
+        initStart = `${hrs.toString().padStart(2, '0')}:${mins}`
+      }
+    }
+  }
+
   const [form, setForm] = useState<FormState>({
-    title: '',
-    category: '',
-    date: '',
-    startTime: '',
+    title: existingEvent?.title || '',
+    category: existingEvent?.category || '',
+    date: initDate,
+    startTime: initStart,
     endTime: '',
-    location: '',
-    capacity: '',
-    description: '',
-    imageUrl: '',
-    agenda: [{ id: crypto.randomUUID(), time: '', activity: '' }],
+    location: existingEvent?.location || '',
+    capacity: existingEvent?.capacity ? String(existingEvent.capacity) : '',
+    description: existingEvent?.description || '',
+    imageUrl: existingEvent?.image || '',
+    agenda: existingEvent?.agenda?.length 
+      ? existingEvent.agenda.map(a => ({ id: crypto.randomUUID(), time: a.time, activity: a.activity }))
+      : [{ id: crypto.randomUUID(), time: '', activity: '' }],
   })
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'draft' } | null>(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -235,14 +264,24 @@ export function CreateEventForm({ onBack, userEmail }: CreateEventFormProps) {
 
   const handlePublish = async () => {
     if (!validate()) return
-    await createEvent(buildEventData('Published'))
-    showToast('Event published!', 'success')
+    if (eventIdToEdit) {
+      await updateEvent(eventIdToEdit, buildEventData('Published'))
+      showToast('Event updated!', 'success')
+    } else {
+      await createEvent(buildEventData('Published'))
+      showToast('Event published!', 'success')
+    }
     setTimeout(() => onBack(), 1200)
   }
 
   const handleSaveDraft = async () => {
-    await createEvent(buildEventData('Draft'))
-    showToast('Saved as draft', 'draft')
+    if (eventIdToEdit) {
+      await updateEvent(eventIdToEdit, buildEventData('Draft'))
+      showToast('Draft updated', 'draft')
+    } else {
+      await createEvent(buildEventData('Draft'))
+      showToast('Saved as draft', 'draft')
+    }
     setTimeout(() => onBack(), 1200)
   }
 

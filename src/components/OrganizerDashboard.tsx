@@ -11,14 +11,10 @@ import {
   Clock,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { getAllEvents } from '../dataStore'
+import { getAllEvents, updateEvent } from '../dataStore'
 import { RegistrationsChart } from './RegistrationsChart'
 
-interface OrganizerDashboardProps {
-  onCreateEventClick: () => void
-}
-
-export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+export function OrganizerDashboard({ setActiveTab, onDataChange, onEditEvent }: { setActiveTab: (tab: string) => void, onDataChange?: () => void, onEditEvent?: (id: string) => void }) {
   const EVENTS = getAllEvents()
   const totalRegs = EVENTS.reduce((sum, e) => sum + e.registered, 0)
   const stats = [
@@ -41,6 +37,17 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
       color: 'amber',
     },
   ]
+
+  const handlePublish = async (id: string) => {
+    await updateEvent(id, { status: 'Published' })
+    onDataChange?.()
+  }
+
+  const handleCancel = async (id: string) => {
+    if (!confirm('Are you sure you want to cancel this event?')) return
+    await updateEvent(id, { status: 'Cancelled' })
+    onDataChange?.()
+  }
 
   return (
     <motion.div 
@@ -73,17 +80,9 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
           return (
             <motion.div
               key={i}
-              initial={{
-                opacity: 0,
-                y: 20,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                delay: i * 0.1,
-              }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
               className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-6 shadow-sm border border-slate-100/80 flex items-center gap-6"
             >
               <div
@@ -120,15 +119,9 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
           <div className="p-6 border-b border-slate-100/80 flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-800">My Events</h2>
             <div className="flex gap-2">
-              <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors focus:outline-none">
-                All
-              </button>
-              <button className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors focus:outline-none">
-                Published
-              </button>
-              <button className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors focus:outline-none">
-                Drafts
-              </button>
+              <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors focus:outline-none">All</button>
+              <button className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors focus:outline-none">Published</button>
+              <button className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors focus:outline-none">Drafts</button>
             </div>
           </div>
 
@@ -136,68 +129,37 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50">
-                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Event
-                  </th>
-                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Capacity
-                  </th>
-                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider text-right">
-                    Actions
-                  </th>
+                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">Event</th>
+                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider">Capacity</th>
+                  <th className="py-4 px-6 text-sm font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100/80">
                 {EVENTS.map((event, i) => {
                   const isFull = event.registered >= event.capacity
-                  const percentage = Math.min(
-                    100,
-                    (event.registered / event.capacity) * 100,
-                  )
+                  const percentage = Math.min(100, (event.registered / event.capacity) * 100)
                   return (
                     <motion.tr
                       key={event.id}
-                      initial={{
-                        opacity: 0,
-                      }}
-                      animate={{
-                        opacity: 1,
-                      }}
-                      transition={{
-                        delay: i * 0.05,
-                      }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
                       className="hover:bg-slate-50/50 transition-colors group"
                     >
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-4">
-                          <img
-                            src={event.image}
-                            alt=""
-                            className="w-12 h-12 rounded-xl object-cover"
-                          />
+                          <img src={event.image} alt="" className="w-12 h-12 rounded-xl object-cover" />
                           <div>
-                            <div className="font-bold text-slate-800 text-[15px] mb-0.5">
-                              {event.title}
-                            </div>
-                            <div className="text-sm font-medium text-slate-500">
-                              {event.category}
-                            </div>
+                            <div className="font-bold text-slate-800 text-[15px] mb-0.5">{event.title}</div>
+                            <div className="text-sm font-medium text-slate-500">{event.category}</div>
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-6">
-                        <div className="text-[15px] font-semibold text-slate-700">
-                          {event.date.split('•')[0]}
-                        </div>
-                        <div className="text-sm font-medium text-slate-500">
-                          {event.date.split('•')[1]}
-                        </div>
+                        <div className="text-[15px] font-semibold text-slate-700">{event.date.split('•')[0]}</div>
+                        <div className="text-sm font-medium text-slate-500">{event.date.split('•')[1]}</div>
                       </td>
                       <td className="py-4 px-6">
                         <span
@@ -205,7 +167,9 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
                             'px-3 py-1 rounded-lg text-xs font-bold border',
                             event.status === 'Published'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-100/50'
-                              : 'bg-slate-100 text-slate-500 border-slate-200/60',
+                              : event.status === 'Cancelled'
+                                ? 'bg-red-50 text-red-700 border-red-100/50'
+                                : 'bg-slate-100 text-slate-500 border-slate-200/60',
                           )}
                         >
                           {event.status}
@@ -214,32 +178,16 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="flex-1 h-2 w-24 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={cn(
-                                'h-full rounded-full',
-                                isFull ? 'bg-amber-500' : 'bg-emerald-500',
-                              )}
-                              style={{
-                                width: `${percentage}%`,
-                              }}
-                            />
+                            <div className={cn('h-full rounded-full', isFull ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${percentage}%` }} />
                           </div>
-                          <span className="text-sm font-bold text-slate-600 w-12 text-right">
-                            {event.registered}/{event.capacity}
-                          </span>
+                          <span className="text-sm font-bold text-slate-600 w-12 text-right">{event.registered}/{event.capacity}</span>
                         </div>
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                          <button
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus:outline-none"
-                            aria-label={`Edit ${event.title}`}
-                            title="Edit"
-                          >
-                            <Edit2 size={18} strokeWidth={2.5} />
-                          </button>
                           {event.status === 'Draft' && (
                             <button
+                              onClick={() => handlePublish(event.id)}
                               className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors focus:outline-none"
                               aria-label={`Publish ${event.title}`}
                               title="Publish"
@@ -248,12 +196,23 @@ export function OrganizerDashboard({ setActiveTab }: { setActiveTab: (tab: strin
                             </button>
                           )}
                           <button
-                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none"
-                            aria-label={`Cancel ${event.title}`}
-                            title="Cancel"
+                            onClick={() => onEditEvent?.(event.id)}
+                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus:outline-none"
+                            aria-label={`Edit ${event.title}`}
+                            title="Edit"
                           >
-                            <XCircle size={18} strokeWidth={2.5} />
+                            <Edit2 size={18} strokeWidth={2.5} />
                           </button>
+                          {event.status !== 'Cancelled' && (
+                            <button
+                              onClick={() => handleCancel(event.id)}
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none"
+                              aria-label={`Cancel ${event.title}`}
+                              title="Cancel"
+                            >
+                              <XCircle size={18} strokeWidth={2.5} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>

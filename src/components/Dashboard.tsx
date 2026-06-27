@@ -26,6 +26,7 @@ export function Dashboard({ userEmail, onEventSelect, onDataChange }: DashboardP
   const [query, setQuery] = useState('')
 
   const visibleEvents = EVENTS.filter((event) => {
+    if (event.status !== 'Published') return false
     const matchesFilter =
       activeFilter === 'All Events' || event.category === activeFilter
     const matchesQuery =

@@ -79,3 +79,58 @@ def create_event(event: EventCreate, db = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    capacity: Optional[int] = None
+    status: Optional[str] = None
+    image: Optional[str] = None
+    location: Optional[str] = None
+    category: Optional[str] = None
+
+@router.patch("/{event_id}")
+def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
+    try:
+        # Build dynamic query based on provided fields
+        fields = []
+        values = []
+        if updates.title is not None:
+            fields.append("title = %s")
+            values.append(updates.title)
+        if updates.description is not None:
+            fields.append("description = %s")
+            values.append(updates.description)
+        if updates.capacity is not None:
+            fields.append("capacity = %s")
+            values.append(updates.capacity)
+        if updates.status is not None:
+            fields.append("status = %s")
+            values.append("PUBLISHED" if updates.status == "Published" else ("CANCELLED" if updates.status == "Cancelled" else "DRAFT"))
+        if updates.image is not None:
+            fields.append("image = %s")
+            values.append(updates.image)
+        if updates.location is not None:
+            fields.append("location = %s")
+            values.append(updates.location)
+        if updates.category is not None:
+            fields.append("category = %s")
+            values.append(updates.category)
+
+        if not fields:
+            return {"status": "ok"}
+            
+        values.append(event_id)
+        query = f"UPDATE events SET {', '.join(fields)} WHERE id = %s RETURNING id"
+        
+        res = db.execute(query, tuple(values))
+        if not res.fetchone():
+            raise HTTPException(status_code=404, detail="Event not found")
+        db.commit()
+        return {"status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

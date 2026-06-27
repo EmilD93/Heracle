@@ -32,6 +32,8 @@ export function App() {
   )
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
 
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+
   // Force re-render key — incremented when data changes (e.g. new event created, registration)
   const [refreshKey, setRefreshKey] = useState(0)
   const refresh = () => setRefreshKey(k => k + 1)
@@ -45,6 +47,7 @@ export function App() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setSelectedEventId(null)
+    if (tab !== 'create-event') setEditingEventId(null)
   }
 
   const handleLogin = (user: UserAccount) => {
@@ -65,6 +68,7 @@ export function App() {
     setAuthScreen('login')
     setActiveTab('dashboard')
     setSelectedEventId(null)
+    setEditingEventId(null)
   }
 
   // Auto skip login if already logged in
@@ -126,16 +130,22 @@ export function App() {
               />
             )}
             {activeTab === 'organizer' && (
-              <OrganizerDashboard key={`organizer-${refreshKey}`} setActiveTab={handleTabChange} />
+              <OrganizerDashboard 
+                key={`organizer-${refreshKey}`} 
+                setActiveTab={handleTabChange} 
+                onDataChange={refresh}
+                onEditEvent={(id) => { setEditingEventId(String(id)); handleTabChange('create-event') }}
+              />
             )}
             {activeTab === 'my-events' && (
               <MyEvents key={`my-events-${refreshKey}`} userEmail={userEmail} />
             )}
             {activeTab === 'create-event' && (
               <CreateEventForm
-                key="create-event"
+                key={`create-event-${editingEventId || 'new'}`}
                 userEmail={userEmail}
-                onBack={() => { refresh(); handleTabChange('organizer') }}
+                eventIdToEdit={editingEventId ?? undefined}
+                onBack={() => { setEditingEventId(null); refresh(); handleTabChange('organizer') }}
               />
             )}
             {activeTab !== 'dashboard' && activeTab !== 'organizer' && activeTab !== 'my-events' && activeTab !== 'create-event' && (

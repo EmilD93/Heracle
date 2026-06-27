@@ -98,12 +98,18 @@ export async function createEvent(event: Omit<EventData, 'id' | 'registered'>): 
   }
 }
 
-export function updateEvent(id: string, updates: Partial<EventData>) {
-  const events = getAllEvents()
-  const idx = events.findIndex(e => e.id === id)
-  if (idx === -1) return
-  events[idx] = { ...events[idx], ...updates }
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
+export async function updateEvent(id: string, updates: Partial<EventData>) {
+  try {
+    const res = await fetch(`${API_BASE}/events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+    if (!res.ok) return
+    await syncWithBackend()
+  } catch (err) {
+    console.error('Failed to update event', err)
+  }
 }
 
 export function deleteEvent(id: string) {

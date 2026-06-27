@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# Heracle Event Management App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Welcome to the Heracle project! This application manages university events, allowing organizers to create, publish, and manage events, while students can browse and register for them.
 
-Currently, two official plugins are available:
+## Setup & Running Locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Make sure you have **Node.js** and **Python 3** installed.
+2. The project relies on a Neon PostgreSQL database. The credentials are provided in the backend setup.
+3. To start both the frontend and backend servers at once, double-click the `run.bat` file in the project directory, or run it from your terminal:
+   ```bash
+   ./run.bat
+   ```
 
-## React Compiler
+## Test Accounts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+You can log in using the following predefined accounts for testing:
 
-## Expanding the ESLint configuration
+**Organizer Accounts:**
+- **Sarah Jenkins** 
+  - Email: `sarah.jenkins@university.edu`
+  - Password: `any` (Password check is bypassed for predefined test accounts)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Student Accounts:**
+- **Michael Chen**
+  - Email: `michael.chen@student.edu`
+  - Password: `any`
+- **Emma Wilson**
+  - Email: `emma.wilson@student.edu`
+  - Password: `any`
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+*Note: You can also register a new account on the Login screen if you wish to test registration.*
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Core Features
+- **Student Dashboard:** View published events, filter by category, and register.
+- **Organizer Dashboard:** Create events, save as drafts, publish, edit, and cancel events. View waitlist and registration charts.
+- **My Events:** Students can see which events they are attending and cancel their registration.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Architecture
+- **Frontend:** React + Vite + Tailwind CSS + Framer Motion
+- **Backend:** FastAPI (Python) + PostgreSQL (Neon)
+- **Database Schema:** Defined in `backend/database_design.md` and populated automatically via `schema.sql` on startup.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+If you encounter any issues with the UI not refreshing, make sure both servers (Vite on port 5173, FastAPI on port 8000) are running without errors.
