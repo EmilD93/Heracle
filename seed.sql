@@ -23,10 +23,10 @@ INSERT INTO registrations (id, student_id, event_id, status, position) VALUES
 
 -- 4. Seed Notification Jobs
 -- Simulating a pending reminder job for the upcoming event.
-INSERT INTO notification_jobs (id, event_id, type, payload, status, scheduled_for) VALUES
-('88888888-8888-8888-8888-888888888888', '55555555-5555-5555-5555-555555555555', 'REMINDER', '{"message": "Event starts in 24 hours!"}', 'pending', NOW() + INTERVAL '1 day');
+INSERT INTO notification_jobs (id, user_id, event_id, type, payload, status, scheduled_for) VALUES
+('88888888-8888-8888-8888-888888888888', '22222222-2222-2222-2222-222222222222', '55555555-5555-5555-5555-555555555555', 'RegistrationConfirmed', '{"message": "Event starts in 24 hours!"}', 'pending', NOW() + INTERVAL '1 day');
 
 -- 5. Seed Notification Logs
 -- Simulating a past successful notification log.
-INSERT INTO notification_logs (id, job_id, user_id, status, error_message, sent_at) VALUES
-('99999999-9999-9999-9999-999999999999', '88888888-8888-8888-8888-888888888888', '22222222-2222-2222-2222-222222222222', 'success', NULL, NOW() - INTERVAL '1 hour');
+INSERT INTO notification_logs (id, job_id, user_id, type, status, error_message, sent_at) VALUES
+('99999999-9999-9999-9999-999999999999', '88888888-8888-8888-8888-888888888888', '22222222-2222-2222-2222-222222222222', 'RegistrationConfirmed', 'success', NULL, NOW() - INTERVAL '1 hour');
