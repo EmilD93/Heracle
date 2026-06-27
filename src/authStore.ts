@@ -1,6 +1,3 @@
-// Simple localStorage-based auth store for the frontend demo.
-// In production this would be replaced by real API calls.
-
 export interface UserAccount {
   fullName: string
   email: string
@@ -8,39 +5,44 @@ export interface UserAccount {
   role: 'student' | 'organizer'
 }
 
-const STORAGE_KEY = 'heracle_users'
+const API_BASE = 'http://localhost:8000/api'
 
-function getUsers(): UserAccount[] {
+export async function loginUser(email: string, password: string): Promise<{ ok: true; user: UserAccount } | { ok: false; error: string }> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { ok: false, error: data.detail || 'Login failed' }
+    }
+    return { ok: true, user: data.user }
+  } catch (err) {
+    return { ok: false, error: 'Network error connecting to backend' }
   }
 }
 
-function saveUsers(users: UserAccount[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(users))
-}
-
-export function registerUser(user: UserAccount): { ok: true } | { ok: false; error: string } {
-  const users = getUsers()
-  if (users.some(u => u.email.toLowerCase() === user.email.toLowerCase())) {
-    return { ok: false, error: 'An account with this email already exists' }
+export async function registerUser(user: UserAccount & { password?: string }): Promise<{ ok: true; user: UserAccount } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: user.fullName.split(' ')[0],
+        lastName: user.fullName.split(' ')[1] || '',
+        email: user.email,
+        password: user.password || 'password123',
+        role: user.role
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      return { ok: false, error: data.detail || 'Registration failed' }
+    }
+    return { ok: true, user: data.user }
+  } catch (err) {
+    return { ok: false, error: 'Network error connecting to backend' }
   }
-  users.push(user)
-  saveUsers(users)
-  return { ok: true }
-}
-
-export function loginUser(email: string, password: string): { ok: true; user: UserAccount } | { ok: false; error: string } {
-  const users = getUsers()
-  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
-  if (!user) {
-    return { ok: false, error: 'No account found with this email' }
-  }
-  if (user.password !== password) {
-    return { ok: false, error: 'Incorrect password' }
-  }
-  return { ok: true, user }
 }

@@ -20,7 +20,10 @@ type AuthScreen = 'login' | 'register' | 'app'
 export function App() {
   const screenInit = useScreenInit()
   const [authScreen, setAuthScreen] = useState<AuthScreen>('login')
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null)
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    const saved = localStorage.getItem('heracle_user')
+    return saved ? JSON.parse(saved) : null
+  })
   const [activeTab, setActiveTab] = useState<string>(
     screenInit?.activeTab ?? 'dashboard',
   )
@@ -33,27 +36,43 @@ export function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const refresh = () => setRefreshKey(k => k + 1)
 
+  React.useEffect(() => {
+    import('./dataStore').then(({ syncWithBackend }) => {
+      syncWithBackend().then(refresh)
+    })
+  }, [])
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setSelectedEventId(null)
   }
 
   const handleLogin = (user: UserAccount) => {
+    localStorage.setItem('heracle_user', JSON.stringify(user))
     setCurrentUser(user)
     setAuthScreen('app')
   }
 
   const handleRegister = (user: UserAccount) => {
+    localStorage.setItem('heracle_user', JSON.stringify(user))
     setCurrentUser(user)
     setAuthScreen('app')
   }
 
   const handleLogout = () => {
+    localStorage.removeItem('heracle_user')
     setCurrentUser(null)
     setAuthScreen('login')
     setActiveTab('dashboard')
     setSelectedEventId(null)
   }
+
+  // Auto skip login if already logged in
+  React.useEffect(() => {
+    if (currentUser && authScreen === 'login') {
+      setAuthScreen('app')
+    }
+  }, [currentUser])
 
   if (authScreen === 'login') {
     return (

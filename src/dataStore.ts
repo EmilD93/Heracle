@@ -8,7 +8,7 @@ import { EVENTS as SEED_EVENTS } from './data/events'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface EventData {
-  id: number
+  id: string
   title: string
   description: string
   date: string
@@ -30,7 +30,7 @@ export interface EventData {
 export interface Registration {
   id: string
   userEmail: string
-  eventId: number
+  eventId: string
   status: 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED'
   position: number
   createdAt: string
@@ -53,6 +53,21 @@ export function initializeDataStore() {
 
 // ─── Events CRUD ──────────────────────────────────────────────────────────────
 
+const API_BASE = 'http://localhost:8000/api'
+
+// We still use localStorage as a cache, but we sync it with the backend.
+export async function syncWithBackend() {
+  try {
+    const res = await fetch(`${API_BASE}/events`)
+    if (res.ok) {
+      const events = await res.json()
+      localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
+    }
+  } catch (err) {
+    console.error('Failed to sync events with backend', err)
+  }
+}
+
 export function getAllEvents(): EventData[] {
   try {
     const raw = localStorage.getItem(EVENTS_KEY)
@@ -62,24 +77,28 @@ export function getAllEvents(): EventData[] {
   }
 }
 
-export function getEventById(id: number): EventData | undefined {
-  return getAllEvents().find(e => e.id === id)
-}
-
-export function createEvent(event: Omit<EventData, 'id' | 'registered'>): EventData {
+export function getEventById(id: string | number): EventData | undefined {
   const events = getAllEvents()
-  const newId = events.length > 0 ? Math.max(...events.map(e => e.id)) + 1 : 1
-  const newEvent: EventData = {
-    ...event,
-    id: newId,
-    registered: 0,
-  }
-  events.push(newEvent)
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
-  return newEvent
+  return events.find(e => String(e.id) === String(id))
 }
 
-export function updateEvent(id: number, updates: Partial<EventData>) {
+export async function createEvent(event: Omit<EventData, 'id' | 'registered'>): Promise<EventData | null> {
+  try {
+    const res = await fetch(`${API_BASE}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event)
+    })
+    if (!res.ok) return null
+    await syncWithBackend()
+    return { ...event, id: "pending", registered: 0 }
+  } catch (err) {
+    console.error('Failed to create event', err)
+    return null
+  }
+}
+
+export function updateEvent(id: string, updates: Partial<EventData>) {
   const events = getAllEvents()
   const idx = events.findIndex(e => e.id === id)
   if (idx === -1) return
@@ -87,7 +106,7 @@ export function updateEvent(id: number, updates: Partial<EventData>) {
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
 }
 
-export function deleteEvent(id: number) {
+export function deleteEvent(id: string) {
   const events = getAllEvents().filter(e => e.id !== id)
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
 }
@@ -113,72 +132,25 @@ export function getRegistrationsForUser(userEmail: string): Registration[] {
   )
 }
 
-export function getRegistrationsForEvent(eventId: number): Registration[] {
+export function getRegistrationsForEvent(eventId: string): Registration[] {
   return getAllRegistrations().filter(
     r => r.eventId === eventId && r.status !== 'CANCELLED'
   )
 }
 
-export function getUserRegistrationForEvent(userEmail: string, eventId: number): Registration | undefined {
-  return getAllRegistrations().find(
-    r => r.userEmail === userEmail && r.eventId === eventId && r.status !== 'CANCELLED'
-  )
-}
-
-export function registerForEvent(
-  userEmail: string,
-  eventId: number
-): { ok: true; registration: Registration } | { ok: false; error: string } {
-  // Check if already registered
-  const existing = getUserRegistrationForEvent(userEmail, eventId)
-  if (existing) {
-    return { ok: false, error: 'You are already registered for this event' }
-  }
-
-  const event = getEventById(eventId)
-  if (!event) return { ok: false, error: 'Event not found' }
-
-  const eventRegs = getRegistrationsForEvent(eventId)
-  const confirmedCount = eventRegs.filter(r => r.status === 'CONFIRMED').length
-  const isFull = confirmedCount >= event.capacity
-
-  const allRegs = getAllRegistrations()
-  const position = eventRegs.length + 1
-
-  const newReg: Registration = {
-    id: crypto.randomUUID(),
-    userEmail,
-    eventId,
-    status: isFull ? 'WAITLISTED' : 'CONFIRMED',
-    position,
-    createdAt: new Date().toISOString(),
-  }
-
-  allRegs.push(newReg)
-  saveRegistrations(allRegs)
-
-  // Update the registered count on the event
-  if (!isFull) {
-    updateEvent(eventId, { registered: confirmedCount + 1 })
-  }
-
-  return { ok: true, registration: newReg }
-}
-
 export function cancelRegistration(userEmail: string, eventId: number) {
   const allRegs = getAllRegistrations()
   const idx = allRegs.findIndex(
-    r => r.userEmail === userEmail && r.eventId === eventId && r.status !== 'CANCELLED'
+    r => r.userEmail === userEmail && String(r.eventId) === String(eventId) && r.status !== 'CANCELLED'
   )
   if (idx === -1) return
 
   const wasConfirmed = allRegs[idx].status === 'CONFIRMED'
   allRegs[idx].status = 'CANCELLED'
 
-  // If the cancelled registration was confirmed, promote the first waitlisted person
   if (wasConfirmed) {
     const waitlisted = allRegs
-      .filter(r => r.eventId === eventId && r.status === 'WAITLISTED')
+      .filter(r => String(r.eventId) === String(eventId) && r.status === 'WAITLISTED')
       .sort((a, b) => a.position - b.position)
 
     if (waitlisted.length > 0) {
@@ -187,15 +159,39 @@ export function cancelRegistration(userEmail: string, eventId: number) {
         allRegs[promoted].status = 'CONFIRMED'
       }
     } else {
-      // Decrease registered count
       const event = getEventById(eventId)
       if (event) {
-        updateEvent(eventId, { registered: Math.max(0, event.registered - 1) })
+        updateEvent(String(eventId), { registered: Math.max(0, event.registered - 1) })
       }
     }
   }
 
   saveRegistrations(allRegs)
+}
+
+export async function registerForEvent(userEmail: string, eventId: string | number): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/${eventId}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userEmail })
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data.detail || 'Failed to register' }
+
+    // Save to local cache so it persists on refresh
+    const allRegs = getAllRegistrations()
+    allRegs.push(data.registration)
+    saveRegistrations(allRegs)
+
+    // Sync events to get updated capacity
+    await syncWithBackend()
+
+    return data
+  } catch (err) {
+    console.error('Failed to register', err)
+    return { ok: false, error: 'Network error' }
+  }
 }
 
 // ─── Helper: Get "My Events" enriched data ────────────────────────────────────
@@ -220,7 +216,7 @@ export function getMyEvents(userEmail: string): MyEventEnriched[] {
   today.setHours(0, 0, 0, 0)
 
   return regs.map(reg => {
-    const event = events.find(e => e.id === reg.eventId)
+    const event = events.find(e => String(e.id) === String(reg.eventId))
     if (!event) return null
 
     // Parse the event date
@@ -240,8 +236,8 @@ export function getMyEvents(userEmail: string): MyEventEnriched[] {
     }
 
     // Generate a ticket code from event id and registration
-    const prefix = event.title.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 3)
-    const ticketCode = `${prefix}-${event.id}-${reg.id.slice(0, 4).toUpperCase()}`
+    const prefix = event.title.split(' ').map((w: any) => w[0]).join('').toUpperCase().slice(0, 3)
+    const ticketCode = `${prefix}-${event.id}-${String(reg.id).slice(0, 4).toUpperCase()}`
 
     return {
       id: event.id,
