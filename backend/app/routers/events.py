@@ -88,10 +88,12 @@ class EventUpdate(BaseModel):
     image: Optional[str] = None
     location: Optional[str] = None
     category: Optional[str] = None
+    date: Optional[str] = None
 
 @router.patch("/{event_id}")
 def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
     try:
+        from datetime import datetime
         # Build dynamic query based on provided fields
         fields = []
         values = []
@@ -116,6 +118,22 @@ def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
         if updates.category is not None:
             fields.append("category = %s")
             values.append(updates.category)
+        if updates.date is not None:
+            try:
+                # e.g. "Jun 29, 2026 • 10:00 AM" or "Jun 29, 2026 • 10:00 AM - 12:00 PM"
+                parts = [p.strip() for p in updates.date.split("•")]
+                date_str = parts[0]
+                time_str = parts[1] if len(parts) > 1 else "10:00 AM"
+                # Remove " - ..." or " – ..." if present
+                start_time_str = time_str.replace("–", "-").split("-")[0].strip()
+                dt = datetime.strptime(f"{date_str} {start_time_str}", "%b %d, %Y %I:%M %p")
+                fields.append("start_time = %s")
+                values.append(dt)
+                fields.append("end_time = %s")
+                values.append(dt) # just use start_time for end_time for simplicity since we don't have duration
+            except Exception as e:
+                pass
+
 
         if not fields:
             return {"status": "ok"}
