@@ -5,7 +5,7 @@ export interface UserAccount {
   role: 'student' | 'organizer'
 }
 
-const API_BASE = 'http://localhost:8000/api'
+const API_BASE = '/api'
 
 export async function loginUser(email: string, password: string): Promise<{ ok: true; user: UserAccount } | { ok: false; error: string }> {
   try {
