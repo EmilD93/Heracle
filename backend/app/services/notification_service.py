@@ -1,56 +1,42 @@
-import json
-from datetime import datetime, timezone
-from typing import Optional
+from __future__ import annotations
+
+from typing import Any, Optional
+from uuid import UUID
+
+from sqlalchemy.orm import Session
+
+from backend.app.models.notification_job import NotificationJob
+from backend.app.repositories.notification_job_repository import NotificationJobRepository
 
 
 def create_notification_job(
-    db,
+    db: Session,
     notification_type: str,
-    user_id: str,
-    event_id: str,
-    registration_id: Optional[str],
-    payload: dict
-):
+    user_id: UUID | str,
+    event_id: UUID | str,
+    registration_id: Optional[UUID | str] = None,
+    payload: Optional[dict[str, Any]] = None,
+) -> NotificationJob:
     """
-    Creates a notification job.
+    Creates a pending notification job.
 
-    This function is called by the API after something important happens,
+    This function should be called after important registration actions,
     for example:
     - RegistrationConfirmed
     - RegistrationWaitlisted
     - WaitlistPromoted
+    - EventCancelled
 
-    The API does not send the notification directly.
-    It only creates a pending job.
-    The worker processes the job later.
+    No worker logic is handled here.
+    This only creates the database record.
     """
 
-    query = """
-        INSERT INTO notification_jobs (
-            type,
-            status,
-            user_id,
-            event_id,
-            registration_id,
-            payload,
-            scheduled_for
-        )
-        VALUES (
-            :type,
-            'pending',
-            :user_id,
-            :event_id,
-            :registration_id,
-            :payload,
-            :scheduled_for
-        )
-    """
+    repository = NotificationJobRepository(db)
 
-    db.execute(query, {
-        "type": notification_type,
-        "user_id": user_id,
-        "event_id": event_id,
-        "registration_id": registration_id,
-        "payload": json.dumps(payload),
-        "scheduled_for": datetime.now(timezone.utc)
-    })
+    return repository.create(
+        notification_type=notification_type,
+        user_id=user_id,
+        event_id=event_id,
+        registration_id=registration_id,
+        payload=payload or {},
+    )
