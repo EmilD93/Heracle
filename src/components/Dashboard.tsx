@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { EventCard } from './EventCard'
 import { Bell, Search, SlidersHorizontal } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { EVENTS } from '../data/events'
+import { getAllEvents } from '../dataStore'
 
 const FILTERS = [
   'All Events',
@@ -15,14 +15,18 @@ const FILTERS = [
 ] as const
 
 interface DashboardProps {
+  userEmail: string
   onEventSelect: (id: number) => void
+  onDataChange: () => void
 }
 
-export function Dashboard({ onEventSelect }: DashboardProps) {
+export function Dashboard({ userEmail, onEventSelect, onDataChange }: DashboardProps) {
+  const EVENTS = getAllEvents()
   const [activeFilter, setActiveFilter] = useState<string>('All Events')
   const [query, setQuery] = useState('')
 
   const visibleEvents = EVENTS.filter((event) => {
+    if (event.status !== 'Published') return false
     const matchesFilter =
       activeFilter === 'All Events' || event.category === activeFilter
     const matchesQuery =
@@ -112,7 +116,7 @@ export function Dashboard({ onEventSelect }: DashboardProps) {
         >
           <AnimatePresence mode="popLayout">
             {visibleEvents.map((event) => (
-              <EventCard key={event.id} {...event} onSelect={onEventSelect} />
+              <EventCard key={event.id} {...event} userEmail={userEmail} onSelect={onEventSelect} onDataChange={onDataChange} />
             ))}
           </AnimatePresence>
         </motion.div>

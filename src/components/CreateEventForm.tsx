@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { createEvent } from '../dataStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,20 +145,50 @@ function Toast({ message, type }: { message: string; type: 'success' | 'draft' }
 
 interface CreateEventFormProps {
   onBack: () => void
+  userEmail: string
+  eventIdToEdit?: string
 }
 
-export function CreateEventForm({ onBack }: CreateEventFormProps) {
+export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEventFormProps) {
+  const existingEvent = eventIdToEdit ? getEventById(eventIdToEdit) : null
+
+  // Helper to parse date/time back to form format
+  let initDate = ''
+  let initStart = ''
+  if (existingEvent && typeof existingEvent.date === 'string') {
+    const parts = existingEvent.date.split('•')
+    if (parts.length > 0) {
+      const d = new Date(parts[0].trim())
+      if (!isNaN(d.getTime())) initDate = d.toISOString().split('T')[0]
+    }
+    if (parts.length > 1) {
+      const t = parts[1].trim()
+      // very basic conversion from "06:45 PM" to "18:45"
+      const timeMatch = t.match(/(\d+):(\d+)\s*(AM|PM)/i)
+      if (timeMatch) {
+        let hrs = parseInt(timeMatch[1], 10)
+        const mins = timeMatch[2]
+        const ampm = timeMatch[3].toUpperCase()
+        if (ampm === 'PM' && hrs < 12) hrs += 12
+        if (ampm === 'AM' && hrs === 12) hrs = 0
+        initStart = `${hrs.toString().padStart(2, '0')}:${mins}`
+      }
+    }
+  }
+
   const [form, setForm] = useState<FormState>({
-    title: '',
-    category: '',
-    date: '',
-    startTime: '',
+    title: existingEvent?.title || '',
+    category: existingEvent?.category || '',
+    date: initDate,
+    startTime: initStart,
     endTime: '',
-    location: '',
-    capacity: '',
-    description: '',
-    imageUrl: '',
-    agenda: [{ id: crypto.randomUUID(), time: '', activity: '' }],
+    location: existingEvent?.location || '',
+    capacity: existingEvent?.capacity ? String(existingEvent.capacity) : '',
+    description: existingEvent?.description || '',
+    imageUrl: existingEvent?.image || '',
+    agenda: (existingEvent?.agenda && Array.isArray(existingEvent.agenda) && existingEvent.agenda.length > 0)
+      ? existingEvent.agenda.map(a => ({ id: Math.random().toString(36).substring(2), time: a.time || '', activity: a.activity || '' }))
+      : [{ id: Math.random().toString(36).substring(2), time: '', activity: '' }],
   })
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'draft' } | null>(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
@@ -172,7 +203,7 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
   const addAgendaItem = () =>
     setForm((f) => ({
       ...f,
-      agenda: [...f.agenda, { id: crypto.randomUUID(), time: '', activity: '' }],
+      agenda: [...f.agenda, { id: Math.random().toString(36).substring(2), time: '', activity: '' }],
     }))
 
   const removeAgendaItem = (id: string) =>
@@ -201,17 +232,69 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
     setTimeout(() => setToast(null), 3000)
   }
 
-  const handlePublish = () => {
-    if (!validate()) return
-    showToast('Event published!', 'success')
+  const buildEventData = (status: 'Published' | 'Draft') => {
+    const dateFormatted = form.date
+      ? new Date(form.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : ''
+    const timeStr = form.startTime
+      ? `${form.startTime}${form.endTime ? ' – ' + form.endTime : ''}`
+      : ''
+    const dateDisplay = dateFormatted + (timeStr ? ` • ${timeStr}` : '')
+
+    return {
+      title: form.title,
+      description: form.description,
+      date: dateDisplay,
+      image: form.imageUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000',
+      capacity: Number(form.capacity) || 100,
+      category: form.category,
+      status,
+      location: form.location,
+      organizer: {
+        name: userEmail.split('@')[0],
+        email: userEmail,
+        phone: '',
+      },
+      agenda: form.agenda
+        .filter(a => a.time || a.activity)
+        .map(a => ({ time: a.time, activity: a.activity })),
+      createdBy: userEmail,
+    }
   }
 
-  const handleSaveDraft = () => {
-    showToast('Saved as draft', 'draft')
+  const handlePublish = async () => {
+    if (!validate()) return
+    if (eventIdToEdit) {
+      await updateEvent(eventIdToEdit, buildEventData('Published'))
+      showToast('Event updated!', 'success')
+    } else {
+      await createEvent(buildEventData('Published'))
+      showToast('Event published!', 'success')
+    }
+    setTimeout(() => onBack(), 1200)
+  }
+
+  const handleSaveDraft = async () => {
+    if (eventIdToEdit) {
+      await updateEvent(eventIdToEdit, buildEventData('Draft'))
+      showToast('Draft updated', 'draft')
+    } else {
+      await createEvent(buildEventData('Draft'))
+      showToast('Saved as draft', 'draft')
+    }
+    setTimeout(() => onBack(), 1200)
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const url = URL.createObjectURL(file)
+      set('imageUrl', url)
+    }
   }
 
   // Live preview image
-  const previewImage = form.imageUrl.startsWith('http') ? form.imageUrl : null
+  const previewImage = (form.imageUrl?.startsWith('http') || form.imageUrl?.startsWith('blob:') || form.imageUrl?.startsWith('data:')) ? form.imageUrl : null
 
   return (
     <>
@@ -256,10 +339,10 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
         <div className="flex items-start gap-3 mb-10">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-800 tracking-tight mb-2">
-              Create New Event
+              {eventIdToEdit ? 'Edit Event' : 'Create New Event'}
             </h1>
             <p className="text-slate-500 font-semibold text-lg">
-              Fill in the details and publish when ready
+              {eventIdToEdit ? 'Update your event details' : 'Fill in the details and publish when ready'}
             </p>
           </div>
         </div>
@@ -304,7 +387,7 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
                           initial={{ opacity: 0, y: -8 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -8 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-900/10 z-20 overflow-hidden"
+                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-900/10 z-20 overflow-hidden max-h-48 overflow-y-auto"
                         >
                           {CATEGORIES.map((cat) => (
                             <button
@@ -443,19 +526,42 @@ export function CreateEventForm({ onBack }: CreateEventFormProps) {
 
             {/* Cover image */}
             <Section icon={ImageIcon} title="Cover Image" color="amber">
-              <div>
-                <Label>Image URL</Label>
-                <Input
-                  placeholder="https://images.unsplash.com/..."
-                  value={form.imageUrl}
-                  onChange={(e) => set('imageUrl', e.target.value)}
-                />
-                <p className="mt-2 text-xs font-medium text-slate-400">
-                  Paste a direct image link to preview below.
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <Label>Upload Photo</Label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="block w-full text-sm text-slate-500
+                      file:mr-4 file:py-2.5 file:px-5
+                      file:rounded-[1rem] file:border-0
+                      file:text-sm file:font-bold
+                      file:bg-amber-50 file:text-amber-700
+                      hover:file:bg-amber-100 transition-all cursor-pointer"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 border-t border-slate-100"></div>
+                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">or</span>
+                  <div className="flex-1 border-t border-slate-100"></div>
+                </div>
+
+                <div>
+                  <Label>Image URL</Label>
+                  <Input
+                    placeholder="https://images.unsplash.com/..."
+                    value={form.imageUrl}
+                    onChange={(e) => set('imageUrl', e.target.value)}
+                  />
+                  <p className="mt-2 text-xs font-medium text-slate-400">
+                    Paste a direct image link or upload a file to preview below.
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-4 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center transition-all">
+              <div className="mt-5 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center transition-all">
                 {previewImage ? (
                   <img
                     src={previewImage}

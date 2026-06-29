@@ -6,31 +6,108 @@ import { EventDetails } from './components/EventDetails'
 import { OrganizerDashboard } from './components/OrganizerDashboard'
 import { MyEvents } from './components/MyEvents'
 import { CreateEventForm } from './components/CreateEventForm'
+import { LoginPage } from './components/Loginpage.tsx'
+import { RegisterPage } from './components/RegisterPage'
 import { useScreenInit } from './useScreenInit.js'
+import { initializeDataStore } from './dataStore'
+import type { UserAccount } from './authStore'
+
+// Initialize the data store with seed data on first load
+initializeDataStore()
+
+type AuthScreen = 'login' | 'register' | 'app'
 
 export function App() {
   const screenInit = useScreenInit()
+  const [authScreen, setAuthScreen] = useState<AuthScreen>('login')
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    const saved = localStorage.getItem('heracle_user')
+    return saved ? JSON.parse(saved) : null
+  })
   const [activeTab, setActiveTab] = useState<string>(
     screenInit?.activeTab ?? 'dashboard',
   )
   const [selectedEventId, setSelectedEventId] = useState<number | null>(
     screenInit?.selectedEventId ?? null,
   )
-  
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
+
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+
+  // Force re-render key — incremented when data changes (e.g. new event created, registration)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refresh = () => setRefreshKey(k => k + 1)
+
+  React.useEffect(() => {
+    import('./dataStore').then(({ syncWithBackend }) => {
+      syncWithBackend().then(refresh)
+    })
+  }, [])
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setSelectedEventId(null)
+    if (tab !== 'create-event') setEditingEventId(null)
   }
+
+  const handleLogin = (user: UserAccount) => {
+    localStorage.setItem('heracle_user', JSON.stringify(user))
+    setCurrentUser(user)
+    setAuthScreen('app')
+  }
+
+  const handleRegister = (user: UserAccount) => {
+    localStorage.setItem('heracle_user', JSON.stringify(user))
+    setCurrentUser(user)
+    setAuthScreen('app')
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('heracle_user')
+    setCurrentUser(null)
+    setAuthScreen('login')
+    setActiveTab('dashboard')
+    setSelectedEventId(null)
+    setEditingEventId(null)
+  }
+
+  // Auto skip login if already logged in
+  React.useEffect(() => {
+    if (currentUser && authScreen === 'login') {
+      setAuthScreen('app')
+    }
+  }, [currentUser])
+
+  if (authScreen === 'login') {
+    return (
+      <LoginPage
+        onLogin={handleLogin}
+        onNavigateToRegister={() => setAuthScreen('register')}
+      />
+    )
+  }
+
+  if (authScreen === 'register') {
+    return (
+      <RegisterPage
+        onRegister={handleRegister}
+        onNavigateToLogin={() => setAuthScreen('login')}
+      />
+    )
+  }
+
+  const userEmail = currentUser?.email ?? ''
 
   return (
     <div className="flex h-screen w-full bg-[#f1f5f9] p-4 gap-4 font-sans overflow-hidden">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={handleTabChange} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
+        userName={currentUser?.fullName ?? 'Guest'}
+        userRole={currentUser?.role ?? 'student'}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 bg-white/40 backdrop-blur-3xl rounded-[2.5rem] border border-white/60 shadow-sm overflow-hidden relative flex flex-col">
@@ -41,25 +118,34 @@ export function App() {
         <div className="relative z-10 h-full flex flex-col">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && !selectedEventId && (
-              <Dashboard key="dashboard" onEventSelect={setSelectedEventId} />
+              <Dashboard key={`dashboard-${refreshKey}`} userEmail={userEmail} onEventSelect={setSelectedEventId} onDataChange={refresh} />
             )}
             {activeTab === 'dashboard' && selectedEventId && (
               <EventDetails
-                key="details"
+                key={`details-${selectedEventId}-${refreshKey}`}
                 eventId={selectedEventId}
+                userEmail={userEmail}
                 onBack={() => setSelectedEventId(null)}
+                onDataChange={refresh}
               />
             )}
             {activeTab === 'organizer' && (
-              <OrganizerDashboard key="organizer" setActiveTab={handleTabChange} />
+              <OrganizerDashboard 
+                key={`organizer-${refreshKey}`} 
+                setActiveTab={handleTabChange} 
+                onDataChange={refresh}
+                onEditEvent={(id) => { setEditingEventId(String(id)); handleTabChange('create-event') }}
+              />
             )}
             {activeTab === 'my-events' && (
-              <MyEvents key="my-events" />
+              <MyEvents key={`my-events-${refreshKey}`} userEmail={userEmail} />
             )}
             {activeTab === 'create-event' && (
-              <CreateEventForm 
-                key="create-event" 
-                onBack={() => handleTabChange('organizer')} // Sends user back to organizer view
+              <CreateEventForm
+                key={`create-event-${editingEventId || 'new'}`}
+                userEmail={userEmail}
+                eventIdToEdit={editingEventId ?? undefined}
+                onBack={() => { setEditingEventId(null); refresh(); handleTabChange('organizer') }}
               />
             )}
             {activeTab !== 'dashboard' && activeTab !== 'organizer' && activeTab !== 'my-events' && activeTab !== 'create-event' && (

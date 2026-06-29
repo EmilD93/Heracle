@@ -11,29 +11,45 @@ import {
   Clock,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { EVENTS } from '../data/events'
+import { getEventById, getUserRegistrationForEvent, registerForEvent } from '../dataStore'
+
 interface EventDetailsProps {
   eventId: number
+  userEmail: string
   onBack: () => void
+  onDataChange: () => void
 }
-export function EventDetails({ eventId, onBack }: EventDetailsProps) {
-  const event = EVENTS.find((e) => e.id === eventId)
+
+export function EventDetails({ eventId, userEmail, onBack, onDataChange }: EventDetailsProps) {
+  const event = getEventById(eventId)
+  const existingReg = getUserRegistrationForEvent(userEmail, eventId)
+
   const [registered, setRegistered] = useState(event?.registered || 0)
   const [status, setStatus] = useState<'idle' | 'registered' | 'waitlisted'>(
-    'idle',
+    existingReg
+      ? existingReg.status === 'CONFIRMED' ? 'registered' : 'waitlisted'
+      : 'idle',
   )
+
   if (!event) return null
+
   const isFull = registered >= event.capacity
   const percentage = Math.min(100, (registered / event.capacity) * 100)
-  const handleAction = () => {
+
+  const handleAction = async () => {
     if (status !== 'idle') return
-    if (isFull) {
-      setStatus('waitlisted')
-    } else {
+    const result = await registerForEvent(userEmail, eventId)
+    if (!result.ok) return
+
+    if (result.registration.status === 'CONFIRMED') {
       setStatus('registered')
-      setRegistered((r) => r + 1)
+      setRegistered(r => r + 1)
+    } else {
+      setStatus('waitlisted')
     }
+    onDataChange()
   }
+
   const buttonLabel =
     status === 'registered'
       ? 'Registered'
@@ -43,20 +59,12 @@ export function EventDetails({ eventId, onBack }: EventDetailsProps) {
           ? 'Join Waitlist'
           : 'Register Now'
   const isDone = status !== 'idle'
+
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        x: 20,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      exit={{
-        opacity: 0,
-        x: -20,
-      }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
       className="flex-1 h-full overflow-y-auto custom-scrollbar relative z-10"
     >
       <div className="p-10 pb-20 max-w-5xl mx-auto">
@@ -186,25 +194,16 @@ export function EventDetails({ eventId, onBack }: EventDetailsProps) {
                         ? 'bg-gradient-to-r from-amber-400 to-orange-500'
                         : 'bg-gradient-to-r from-emerald-400 to-teal-500',
                     )}
-                    initial={{
-                      width: 0,
-                    }}
-                    animate={{
-                      width: `${percentage}%`,
-                    }}
-                    transition={{
-                      duration: 1,
-                      ease: 'easeOut',
-                    }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${percentage}%` }}
+                    transition={{ duration: 1, ease: 'easeOut' }}
                   />
                 </div>
 
                 <motion.button
                   onClick={handleAction}
                   disabled={isDone}
-                  whileTap={{
-                    scale: isDone ? 1 : 0.97,
-                  }}
+                  whileTap={{ scale: isDone ? 1 : 0.97 }}
                   className={cn(
                     'w-full py-4 rounded-[1.25rem] font-bold text-[16px] transition-colors duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2',
                     status === 'registered'

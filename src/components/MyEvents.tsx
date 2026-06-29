@@ -11,89 +11,12 @@ import {
   Search,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type EventStatus = 'upcoming' | 'waitlisted' | 'past'
-
-interface MyEvent {
-  id: number
-  title: string
-  category: string
-  date: string
-  time: string
-  location: string
-  image: string
-  status: EventStatus
-  ticketCode: string
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MY_EVENTS: MyEvent[] = [
-  {
-    id: 1,
-    title: 'Annual Tech Career Fair',
-    category: 'Technology',
-    date: 'Jul 12, 2025',
-    time: '10:00 AM – 4:00 PM',
-    location: 'Engineering Hall, Room 201',
-    image:
-      'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=800',
-    status: 'upcoming',
-    ticketCode: 'TCF-2025-0041',
-  },
-  {
-    id: 2,
-    title: 'Intro to Machine Learning Workshop',
-    category: 'Academic',
-    date: 'Jul 18, 2025',
-    time: '2:00 PM – 5:00 PM',
-    location: 'CS Building, Lab 3',
-    image:
-      'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=800',
-    status: 'upcoming',
-    ticketCode: 'IML-2025-0089',
-  },
-  {
-    id: 3,
-    title: 'Spring Music Festival',
-    category: 'Entertainment',
-    date: 'Jul 25, 2025',
-    time: '6:00 PM – 11:00 PM',
-    location: 'Campus Amphitheater',
-    image:
-      'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&q=80&w=800',
-    status: 'waitlisted',
-    ticketCode: 'SMF-2025-0212',
-  },
-  {
-    id: 4,
-    title: 'Hackathon 2025',
-    category: 'Technology',
-    date: 'Jun 7, 2025',
-    time: '9:00 AM – 9:00 AM',
-    location: 'Innovation Center',
-    image:
-      'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800',
-    status: 'past',
-    ticketCode: 'HCK-2025-0007',
-  },
-  {
-    id: 5,
-    title: 'Psychology & Wellness Seminar',
-    category: 'Academic',
-    date: 'May 30, 2025',
-    time: '1:00 PM – 3:00 PM',
-    location: 'Health Sciences Building',
-    image:
-      'https://images.unsplash.com/photo-1527689368864-3a821dbccc34?auto=format&fit=crop&q=80&w=800',
-    status: 'past',
-    ticketCode: 'PWS-2025-0033',
-  },
-]
+import { getMyEvents } from '../dataStore'
+import type { MyEventEnriched } from '../dataStore'
 
 // ─── Status config ────────────────────────────────────────────────────────────
+
+type EventStatus = 'upcoming' | 'waitlisted' | 'past'
 
 const STATUS_CONFIG: Record<
   EventStatus,
@@ -125,7 +48,7 @@ function TicketModal({
   event,
   onClose,
 }: {
-  event: MyEvent
+  event: MyEventEnriched
   onClose: () => void
 }) {
   const cfg = STATUS_CONFIG[event.status]
@@ -205,24 +128,32 @@ function TicketModal({
             ))}
           </div>
 
-          {/* Barcode-style ticket code */}
-          <div className="bg-slate-50 rounded-[1.25rem] p-4 text-center border border-slate-100">
-            <div className="flex justify-center gap-px mb-2.5">
-              {Array.from({ length: 36 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-slate-800 rounded-sm"
-                  style={{
-                    width: [1, 2, 1, 3, 1, 2, 1, 1, 3, 1][i % 10] + 1,
-                    height: i % 5 === 0 ? 28 : 20,
-                  }}
-                />
-              ))}
+          {/* Barcode-style ticket code or Waitlist Info */}
+          {event.status === 'waitlisted' && event.position ? (
+            <div className="bg-amber-50 rounded-[1.25rem] p-4 text-center border border-amber-200">
+              <p className="text-sm font-bold text-amber-700 mb-1">Your Waitlist Position</p>
+              <p className="text-3xl font-extrabold text-amber-500">#{event.position}</p>
+              <p className="text-xs font-semibold text-amber-700/80 mt-2">We'll notify you if a spot opens up!</p>
             </div>
-            <p className="text-xs font-mono font-bold text-slate-500 tracking-widest">
-              {event.ticketCode}
-            </p>
-          </div>
+          ) : (
+            <div className="bg-slate-50 rounded-[1.25rem] p-4 text-center border border-slate-100">
+              <div className="flex justify-center gap-px mb-2.5">
+                {Array.from({ length: 36 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-slate-800 rounded-sm"
+                    style={{
+                      width: [1, 2, 1, 3, 1, 2, 1, 1, 3, 1][i % 10] + 1,
+                      height: i % 5 === 0 ? 28 : 20,
+                    }}
+                  />
+                ))}
+              </div>
+              <p className="text-xs font-mono font-bold text-slate-500 tracking-widest">
+                {event.ticketCode}
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
@@ -235,8 +166,8 @@ function EventRow({
   event,
   onViewTicket,
 }: {
-  event: MyEvent
-  onViewTicket: (event: MyEvent) => void
+  event: MyEventEnriched
+  onViewTicket: (event: MyEventEnriched) => void
 }) {
   const cfg = STATUS_CONFIG[event.status]
   const isPast = event.status === 'past'
@@ -282,6 +213,11 @@ function EventRow({
             <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot)} />
             {cfg.label}
           </span>
+          {event.status === 'waitlisted' && event.position && (
+             <span className="text-[11px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">
+               Pos: #{event.position}
+             </span>
+          )}
           <span className="text-[11px] font-semibold text-slate-400">
             {event.category}
           </span>
@@ -324,10 +260,16 @@ function EventRow({
 const TABS = ['All', 'Upcoming', 'Waitlisted', 'Past'] as const
 type Tab = (typeof TABS)[number]
 
-export function MyEvents() {
+interface MyEventsProps {
+  userEmail: string
+}
+
+export function MyEvents({ userEmail }: MyEventsProps) {
   const [activeTab, setActiveTab] = useState<Tab>('All')
-  const [selectedEvent, setSelectedEvent] = useState<MyEvent | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<MyEventEnriched | null>(null)
   const [query, setQuery] = useState('')
+
+  const MY_EVENTS = getMyEvents(userEmail)
 
   const filtered = MY_EVENTS.filter((e) => {
     const matchesTab =

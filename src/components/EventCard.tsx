@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Calendar, Check, Clock } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { getEventById, getUserRegistrationForEvent, registerForEvent } from '../dataStore'
 interface EventCardProps {
   id: number
   title: string
@@ -11,7 +12,9 @@ interface EventCardProps {
   capacity: number
   registered: number
   category: string
+  userEmail?: string
   onSelect?: (id: number) => void
+  onDataChange?: () => void
 }
 export function EventCard({
   id,
@@ -22,23 +25,33 @@ export function EventCard({
   capacity,
   registered: initialRegistered,
   category,
+  userEmail,
   onSelect,
+  onDataChange,
 }: EventCardProps) {
-  const [registered, setRegistered] = useState(initialRegistered)
+  const currentEvent = getEventById(id)
+  const existingReg = userEmail ? getUserRegistrationForEvent(userEmail, id) : undefined
+  const [registered, setRegistered] = useState(currentEvent?.registered ?? initialRegistered)
   const [status, setStatus] = useState<'idle' | 'registered' | 'waitlisted'>(
-    'idle',
+    existingReg
+      ? existingReg.status === 'CONFIRMED' ? 'registered' : 'waitlisted'
+      : 'idle',
   )
   const isFull = registered >= capacity
   const percentage = Math.min(100, (registered / capacity) * 100)
-  const handleAction = (e: React.MouseEvent) => {
+  const handleAction = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (status !== 'idle') return
-    if (isFull) {
-      setStatus('waitlisted')
-    } else {
+    if (status !== 'idle' || !userEmail) return
+    const result = await registerForEvent(userEmail, id)
+    if (!result.ok) return
+
+    if (result.registration.status === 'CONFIRMED') {
       setStatus('registered')
       setRegistered((r) => r + 1)
+    } else {
+      setStatus('waitlisted')
     }
+    if (onDataChange) onDataChange()
   }
   const buttonLabel =
     status === 'registered'
