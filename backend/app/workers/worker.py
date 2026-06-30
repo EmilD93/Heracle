@@ -1,33 +1,40 @@
-import time
+from __future__ import annotations
+
+import argparse
 import json
+import time
+from typing import Any, Optional
+
+from app.database import pool
 
 
-def reset_stuck_jobs(db):
+def reset_stuck_jobs(conn) -> None:
     """
     If the worker crashes while a job is processing,
     this resets old processing jobs back to pending.
     """
 
-    query = """
+    conn.execute(
+        """
         UPDATE notification_jobs
         SET status = 'pending',
             locked_at = NULL
         WHERE status = 'processing'
           AND locked_at < NOW() - INTERVAL '10 minutes';
+        """
+    )
+
+
+def get_next_pending_job(conn) -> Optional[dict[str, Any]]:
     """
-
-    db.execute(query)
-
-
-def get_next_pending_job(db):
-    """
-    Finds the oldest pending job.
+    Finds and locks the oldest pending notification job.
 
     FOR UPDATE SKIP LOCKED prevents two workers from processing
     the same job at the same time.
     """
 
-    query = """
+    result = conn.execute(
+        """
         SELECT *
         FROM notification_jobs
         WHERE status = 'pending'
@@ -35,65 +42,79 @@ def get_next_pending_job(db):
         ORDER BY created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED;
-    """
+        """
+    ).fetchone()
 
-    return db.fetch_one(query)
+    if result is None:
+        return None
+
+    return dict(result)
 
 
-def mark_job_processing(db, job_id):
-    query = """
+def mark_job_processing(conn, job_id: str) -> None:
+    conn.execute(
+        """
         UPDATE notification_jobs
         SET status = 'processing',
             locked_at = NOW()
-        WHERE id = :job_id;
-    """
+        WHERE id = %s;
+        """,
+        (job_id,),
+    )
 
-    db.execute(query, {"job_id": job_id})
 
-
-def mark_job_completed(db, job_id):
-    query = """
+def mark_job_completed(conn, job_id: str) -> None:
+    conn.execute(
+        """
         UPDATE notification_jobs
         SET status = 'completed',
-            completed_at = NOW()
-        WHERE id = :job_id;
-    """
+            completed_at = NOW(),
+            locked_at = NULL,
+            error_message = NULL
+        WHERE id = %s;
+        """,
+        (job_id,),
+    )
 
-    db.execute(query, {"job_id": job_id})
 
-
-def mark_job_failed(db, job_id, error_message):
-    query = """
+def mark_job_failed(conn, job_id: str, error_message: str) -> None:
+    conn.execute(
+        """
         UPDATE notification_jobs
         SET status = 'failed',
             failed_at = NOW(),
-            error_message = :error_message
-        WHERE id = :job_id;
-    """
+            locked_at = NULL,
+            attempt_count = attempt_count + 1,
+            error_message = %s
+        WHERE id = %s;
+        """,
+        (error_message, job_id),
+    )
 
-    db.execute(query, {
-        "job_id": job_id,
-        "error_message": error_message
-    })
 
-
-def retry_job(db, job_id, error_message):
-    query = """
+def retry_job(conn, job_id: str, error_message: str) -> None:
+    conn.execute(
+        """
         UPDATE notification_jobs
         SET status = 'pending',
+            locked_at = NULL,
             attempt_count = attempt_count + 1,
-            error_message = :error_message
-        WHERE id = :job_id;
-    """
-
-    db.execute(query, {
-        "job_id": job_id,
-        "error_message": error_message
-    })
+            error_message = %s
+        WHERE id = %s;
+        """,
+        (error_message, job_id),
+    )
 
 
-def create_notification_log(db, job, status, message=None, error_message=None):
-    query = """
+def create_notification_log(
+    conn,
+    job: dict[str, Any],
+    status: str,
+    message: Optional[str] = None,
+    error_message: Optional[str] = None,
+) -> None:
+    conn.execute(
+        """
         INSERT INTO notification_logs (
             job_id,
             user_id,
@@ -103,34 +124,27 @@ def create_notification_log(db, job, status, message=None, error_message=None):
             error_message,
             sent_at
         )
-        VALUES (
-            :job_id,
-            :user_id,
-            :type,
-            :status,
-            :message,
-            :error_message,
-            NOW()
-        );
+        VALUES (%s, %s, %s, %s, %s, %s, NOW());
+        """,
+        (
+            job["id"],
+            job["user_id"],
+            job["type"],
+            status,
+            message,
+            error_message,
+        ),
+    )
+
+
+def send_notification(job: dict[str, Any]) -> str:
+    """
+    For now, this does not send a real email.
+    It prints the notification so we can prove that the worker
+    processed the notification job.
     """
 
-    db.execute(query, {
-        "job_id": job["id"],
-        "user_id": job["user_id"],
-        "type": job["type"],
-        "status": status,
-        "message": message,
-        "error_message": error_message
-    })
-
-
-def send_notification(job):
-    """
-    For the first project version, this does not send a real email.
-    It prints the notification so we can prove the worker processed the job.
-    """
-
-    payload = job["payload"]
+    payload = job.get("payload") or {}
 
     if isinstance(payload, str):
         payload = json.loads(payload)
@@ -140,77 +154,107 @@ def send_notification(job):
     print("Notification processed")
     print(f"Type: {job['type']}")
     print(f"User ID: {job['user_id']}")
+    print(f"Event ID: {job['event_id']}")
     print(f"Message: {message}")
 
     return message
 
-def run_worker_once(db):
+
+def run_worker_once() -> Optional[dict[str, Any]]:
     """
     Processes one pending notification job.
-
-    This is useful for testing the worker prototype without running
-    an infinite loop.
+    This is useful for testing without running an infinite worker loop.
     """
 
-    reset_stuck_jobs(db)
+    with pool.connection() as conn:
+        try:
+            with conn.transaction():
+                reset_stuck_jobs(conn)
+                job = get_next_pending_job(conn)
 
-    job = get_next_pending_job(db)
+                if job is None:
+                    print("No pending notification jobs found.")
+                    return None
 
-    if job is None:
-        print("No pending notification jobs found.")
-        return None
+                mark_job_processing(conn, str(job["id"]))
 
-    try:
-        mark_job_processing(db, job["id"])
+            try:
+                message = send_notification(job)
 
-        message = send_notification(job)
+                with conn.transaction():
+                    create_notification_log(
+                        conn=conn,
+                        job=job,
+                        status="success",
+                        message=message,
+                    )
+                    mark_job_completed(conn, str(job["id"]))
 
-        create_notification_log(
-            db=db,
-            job=job,
-            status="success",
-            message=message
-        )
+                print(f"Job {job['id']} completed.")
+                return job
 
-        mark_job_completed(db, job["id"])
+            except Exception as error:
+                error_message = str(error)
+                next_attempt_count = job["attempt_count"] + 1
 
-        print(f"Job {job['id']} completed.")
-        return job
+                with conn.transaction():
+                    create_notification_log(
+                        conn=conn,
+                        job=job,
+                        status="failed",
+                        error_message=error_message,
+                    )
 
-    except Exception as error:
-        error_message = str(error)
+                    if next_attempt_count >= job["max_attempts"]:
+                        mark_job_failed(conn, str(job["id"]), error_message)
+                    else:
+                        retry_job(conn, str(job["id"]), error_message)
 
-        create_notification_log(
-            db=db,
-            job=job,
-            status="failed",
-            error_message=error_message
-        )
+                print(f"Job {job['id']} failed: {error_message}")
+                return job
 
-        next_attempt_count = job["attempt_count"] + 1
+        except Exception:
+            conn.rollback()
+            raise
 
-        if next_attempt_count >= job["max_attempts"]:
-            mark_job_failed(db, job["id"], error_message)
-        else:
-            retry_job(db, job["id"], error_message)
 
-        print(f"Job {job['id']} failed: {error_message}")
-        return job
-
-def run_worker(db):
+def run_worker(sleep_seconds: int = 5) -> None:
     """
     Main worker loop.
-
-    Worker algorithm:
-    1. Reset old stuck jobs.
-    2. Find pending jobs.
-    3. Mark job as processing.
-    4. Process notification.
-    5. Save notification log.
-    6. Mark job as completed.
-    7. Retry or fail if an error happens.
     """
 
+    print("Notification worker started.")
+    print("Press Ctrl+C to stop.")
+
     while True:
-        run_worker_once(db)
-        time.sleep(5)
+        run_worker_once()
+        time.sleep(sleep_seconds)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run the notification worker")
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Process one pending job and then stop",
+    )
+    parser.add_argument(
+        "--sleep-seconds",
+        type=int,
+        default=5,
+        help="Seconds to wait between checks in continuous mode",
+    )
+
+    args = parser.parse_args()
+
+    if args.once:
+        run_worker_once()
+    else:
+        run_worker(sleep_seconds=args.sleep_seconds)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    finally:
+        pool.close()

@@ -11,6 +11,7 @@ import { RegisterPage } from './components/RegisterPage'
 import { useScreenInit } from './useScreenInit.js'
 import { initializeDataStore } from './dataStore'
 import type { UserAccount } from './authStore'
+import { clearAuth } from './authStore'
 
 // Initialize the data store with seed data on first load
 initializeDataStore()
@@ -51,19 +52,21 @@ export function App() {
   }
 
   const handleLogin = (user: UserAccount) => {
-    localStorage.setItem('heracle_user', JSON.stringify(user))
+    // JWT вече е записан от authStore.loginUser()
+    // Тук само обновяваме UI state-а
     setCurrentUser(user)
     setAuthScreen('app')
   }
 
   const handleRegister = (user: UserAccount) => {
-    localStorage.setItem('heracle_user', JSON.stringify(user))
+    // JWT вече е записан от authStore.registerUser()
     setCurrentUser(user)
     setAuthScreen('app')
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('heracle_user')
+    // Изтрива JWT + heracle_user от localStorage
+    clearAuth()
     setCurrentUser(null)
     setAuthScreen('login')
     setActiveTab('dashboard')
