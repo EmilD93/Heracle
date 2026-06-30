@@ -53,7 +53,7 @@ export function initializeDataStore() {
 
 // ─── Events CRUD ──────────────────────────────────────────────────────────────
 
-const API_BASE = 'http://localhost:8000/api'
+const API_BASE = '/api'
 
 // We still use localStorage as a cache, but we sync it with the backend.
 export async function syncWithBackend() {
@@ -209,7 +209,7 @@ export async function registerForEvent(userEmail: string, eventId: string | numb
 // ─── Helper: Get "My Events" enriched data ────────────────────────────────────
 
 export interface MyEventEnriched {
-  id: number
+  id: string
   title: string
   category: string
   date: string
@@ -218,7 +218,7 @@ export interface MyEventEnriched {
   image: string
   status: 'upcoming' | 'waitlisted' | 'past'
   ticketCode: string
-  position?: number
+  position: number | undefined
 }
 
 export function getMyEvents(userEmail: string): MyEventEnriched[] {
@@ -263,5 +263,5 @@ export function getMyEvents(userEmail: string): MyEventEnriched[] {
       ticketCode,
       position: reg.status === 'WAITLISTED' ? reg.position : undefined,
     }
-  }).filter(Boolean) as MyEventEnriched[]
+  }).filter((event): event is MyEventEnriched => event !== null)
 }

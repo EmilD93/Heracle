@@ -6,10 +6,20 @@ Welcome to the Heracle project! This application manages university events, allo
 
 1. Make sure you have **Node.js** and **Python 3** installed.
 2. The project relies on a Neon PostgreSQL database. The credentials are provided in the backend setup.
-3. To start both the frontend and backend servers at once, double-click the `run.bat` file in the project directory, or run it from your terminal:
+3. To start both the frontend and backend servers at once:
+
+  **macOS/Linux**
+  ```bash
+  npm run up
+  ```
+
+  **Windows**
+  - Double-click `run.bat`, or run:
    ```bash
    ./run.bat
    ```
+
+4. Stop both servers with **Ctrl+C** in the same terminal where you started them.
 
 ## Test Accounts
 
