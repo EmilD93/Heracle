@@ -4,6 +4,7 @@
 // for fetch() calls — the component interfaces stay the same.
 
 import { EVENTS as SEED_EVENTS } from './data/events'
+import { API_BASE } from './config/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ export interface EventData {
   capacity: number
   registered: number
   category: string
-  status: 'Published' | 'Draft'
+  status: 'Published' | 'Draft' | 'Cancelled'
   location: string
   organizer: {
     name: string
@@ -52,8 +53,6 @@ export function initializeDataStore() {
 }
 
 // ─── Events CRUD ──────────────────────────────────────────────────────────────
-
-const API_BASE = '/api'
 
 // We still use localStorage as a cache, but we sync it with the backend.
 export async function syncWithBackend() {

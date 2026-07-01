@@ -28,8 +28,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>(
     screenInit?.activeTab ?? 'dashboard',
   )
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(
-    screenInit?.selectedEventId ?? null,
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(
+    screenInit?.selectedEventId != null ? String(screenInit.selectedEventId) : null,
   )
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
 

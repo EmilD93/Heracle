@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -14,7 +14,7 @@ import { cn } from '../utils/cn'
 import { getEventById, getUserRegistrationForEvent, registerForEvent } from '../dataStore'
 
 interface EventDetailsProps {
-  eventId: number
+  eventId: string
   userEmail: string
   onBack: () => void
   onDataChange: () => void

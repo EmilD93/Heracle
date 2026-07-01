@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { EventCard } from './EventCard'
 import { Bell, Search, SlidersHorizontal } from 'lucide-react'
@@ -16,7 +16,7 @@ const FILTERS = [
 
 interface DashboardProps {
   userEmail: string
-  onEventSelect: (id: number) => void
+  onEventSelect: (id: string) => void
   onDataChange: () => void
 }
 

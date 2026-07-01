@@ -1,11 +1,10 @@
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
   Calendar,
   MapPin,
   Users,
-  Tag,
   Clock,
   FileText,
   Image as ImageIcon,
@@ -16,7 +15,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { createEvent } from '../dataStore'
+import { createEvent, getEventById, updateEvent } from '../dataStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,7 +186,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
     description: existingEvent?.description || '',
     imageUrl: existingEvent?.image || '',
     agenda: (existingEvent?.agenda && Array.isArray(existingEvent.agenda) && existingEvent.agenda.length > 0)
-      ? existingEvent.agenda.map(a => ({ id: Math.random().toString(36).substring(2), time: a.time || '', activity: a.activity || '' }))
+      ? existingEvent.agenda.map((a: { time?: string; activity?: string }) => ({ id: Math.random().toString(36).substring(2), time: a.time || '', activity: a.activity || '' }))
       : [{ id: Math.random().toString(36).substring(2), time: '', activity: '' }],
   })
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'draft' } | null>(null)
@@ -455,7 +454,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
             {/* Agenda */}
             <Section icon={Calendar} title="Schedule" color="emerald">
               <div className="space-y-3 mb-4">
-                {form.agenda.map((item, i) => (
+                {form.agenda.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
                     <div className="w-6 h-6 rounded-full bg-emerald-50 border-4 border-white shadow-sm shrink-0 mt-0.5" />
                     <Input

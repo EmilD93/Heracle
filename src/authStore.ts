@@ -1,3 +1,5 @@
+import { API_BASE } from './config/api'
+
 export interface UserAccount {
   id?: number
   fullName: string
@@ -5,7 +7,6 @@ export interface UserAccount {
   role: 'student' | 'organizer'
 }
 
-const API_BASE = '/api'
 const TOKEN_KEY = 'heracle_jwt'
 const USER_KEY = 'heracle_user'
 

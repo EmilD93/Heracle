@@ -4,7 +4,7 @@ import { Calendar, Check, Clock } from 'lucide-react'
 import { cn } from '../utils/cn'
 import { getEventById, getUserRegistrationForEvent, registerForEvent } from '../dataStore'
 interface EventCardProps {
-  id: number
+  id: string
   title: string
   description: string
   date: string
@@ -13,7 +13,7 @@ interface EventCardProps {
   registered: number
   category: string
   userEmail?: string
-  onSelect?: (id: number) => void
+  onSelect?: (id: string) => void
   onDataChange?: () => void
 }
 export function EventCard({

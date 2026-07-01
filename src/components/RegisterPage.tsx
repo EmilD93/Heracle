@@ -86,19 +86,18 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
     setRegisterError(null)
     setIsLoading(true)
     await new Promise(r => setTimeout(r, 800))
-    const newUser: UserAccount = {
+    const result = await registerUser({
       fullName: form.fullName,
       email: form.email,
       password: form.password,
       role: form.role,
-    }
-    const result = await registerUser(newUser)
+    })
     setIsLoading(false)
     if (!result.ok) {
       setRegisterError(result.error)
       return
     }
-    onRegister(newUser)
+    onRegister(result.user)
   }
 
   const passwordStrength = PASSWORD_RULES.filter(r => r.test(form.password)).length
