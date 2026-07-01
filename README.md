@@ -21,6 +21,51 @@ Welcome to the Heracle project! This application manages university events, allo
 
 4. Stop both servers with **Ctrl+C** in the same terminal where you started them.
 
+## Notification Worker
+
+The backend writes notification jobs into the `notification_jobs` table. The worker reads pending jobs, processes them, writes a row into `notification_logs`, and updates the job status.
+
+Run the worker once:
+
+```bash
+cd backend
+python -m app.workers.worker --once
+```
+
+Run the worker continuously:
+
+```bash
+cd backend
+python -m app.workers.worker
+```
+
+### Expected flow
+
+1. Register a student for an event.
+2. A new row appears in `notification_jobs` with `status = 'pending'`.
+3. Run the worker:
+
+```bash
+cd backend
+python -m app.workers.worker --once
+```
+
+4. The job status becomes `completed`.
+5. A `success` row appears in `notification_logs`.
+
+### Failed job behavior
+
+A job with this payload can be used to prove failure handling:
+
+```json
+{
+  "force_fail": true,
+  "message": "QA forced failure"
+}
+```
+
+When the worker processes it, the job becomes `failed` and a failed row is written to `notification_logs`.
+
 ## Test Accounts
 
 You can log in using the following predefined accounts for testing:

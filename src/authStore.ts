@@ -6,7 +6,6 @@ export interface UserAccount {
 }
 
 const API_BASE = '/api'
-const API_BASE = 'http://localhost:8000/api'
 const TOKEN_KEY = 'heracle_jwt'
 const USER_KEY = 'heracle_user'
 

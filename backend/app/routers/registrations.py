@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.database import get_db
+from app.services.notification_service import create_notification_job
 
 router = APIRouter()
 
@@ -51,27 +52,46 @@ def register(event_id: str, req: RegistrationRequest, db = Depends(get_db)):
             RETURNING id, status, position, created_at
         """, (user_id, event_id, status, position)).fetchone()
 
-        # Create notification job
-        db.execute("""
-            INSERT INTO notification_jobs (user_id, event_id, registration_id, type, payload, status)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            user_id, event_id, reg['id'],
-            'RegistrationWaitlisted' if status == 'WAITLISTED' else 'RegistrationConfirmed',
-            '{}',
-            'pending'
-        ))
+        notification_type = (
+            "RegistrationWaitlisted"
+            if status == "WAITLISTED"
+            else "RegistrationConfirmed"
+        )
+
+        notification_message = (
+            "You have been added to the waitlist."
+            if status == "WAITLISTED"
+            else "Your registration has been confirmed."
+        )
+
+        notification_job_id = create_notification_job(
+            db=db,
+            notification_type=notification_type,
+            user_id=str(user_id),
+            event_id=str(event_id),
+            registration_id=str(reg["id"]),
+            payload={
+                "message": notification_message,
+                "registration_id": str(reg["id"]),
+                "event_id": str(event_id),
+                "student_id": str(user_id),
+                "status": status,
+            },
+        )
+
+        db.commit()
 
         return {
             "ok": True,
             "registration": {
-                "id": str(reg['id']),
+                "id": str(reg["id"]),
                 "userEmail": req.userEmail,
                 "eventId": event_id,
-                "status": reg['status'],
-                "position": reg['position'],
-                "createdAt": str(reg['created_at'])
-            }
+                "status": reg["status"],
+                "position": reg["position"],
+                "createdAt": str(reg["created_at"]),
+            },
+            "notificationJobId": str(notification_job_id),
         }
     except HTTPException:
         db.rollback()
