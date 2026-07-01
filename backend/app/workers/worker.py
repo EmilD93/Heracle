@@ -149,6 +149,9 @@ def send_notification(job: dict[str, Any]) -> str:
     if isinstance(payload, str):
         payload = json.loads(payload)
 
+    if payload.get("force_fail") is True:
+        raise RuntimeError("Forced worker failure for QA")
+
     message = payload.get("message", "Notification processed")
 
     print("Notification processed")
