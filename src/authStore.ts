@@ -21,6 +21,45 @@ export function saveToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token)
 }
 
+export async function loginWithGoogle(token: string): Promise<{ ok: true; user: UserAccount } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    
+    if (!res.ok) {
+      const err = await res.json()
+      return { ok: false, error: err.detail || 'Google sign-in failed.' }
+    }
+    
+    const data = await res.json()
+    localStorage.setItem('auth_token', data.access_token)
+    
+    // Convert role to strictly 'student' | 'organizer'
+    const normalizedRole = data.user.role.toLowerCase() === 'organizer' ? 'organizer' : 'student'
+    
+    const user: UserAccount = {
+      id: data.user.id,
+      fullName: data.user.fullName || data.user.email.split('@')[0],
+      email: data.user.email,
+      role: normalizedRole,
+    }
+    localStorage.setItem('auth_user', JSON.stringify(user))
+    
+    return { ok: true, user }
+  } catch (error) {
+    console.error('Google login error:', error)
+    return { ok: false, error: 'Network error. Please try again later.' }
+  }
+}
+
+export function logoutUser(): void {
+  localStorage.removeItem('auth_token')
+  localStorage.removeItem('auth_user')
+}
+
 export function clearAuth(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)

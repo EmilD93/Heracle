@@ -167,7 +167,7 @@ export function CalendarView({ onEventSelect }: CalendarViewProps) {
                   key={i}
                   onClick={() => setSelectedDay(day)}
                   className={cn(
-                    'h-24 min-w-0 border-b border-r border-slate-100/60 dark:border-slate-700/60 p-2.5 flex flex-col items-start gap-1.5 text-left transition-colors focus:outline-none',
+                    'min-h-24 h-full min-w-0 border-b border-r border-slate-100/60 dark:border-slate-700/60 p-2.5 flex flex-col items-start justify-start gap-1.5 text-left transition-colors focus:outline-none',
                     !inMonth && 'bg-slate-50/40 dark:bg-slate-900/40',
                     isSelected && 'bg-blue-50/70 dark:bg-blue-500/10',
                     !isSelected && 'hover:bg-slate-50/70 dark:hover:bg-slate-700/40',

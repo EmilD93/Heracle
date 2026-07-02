@@ -125,3 +125,78 @@ def register(req: RegisterRequest, db=Depends(get_db)):
             "role": req.role.lower(),
         },
     }
+
+class GoogleLoginRequest(BaseModel):
+    token: str
+
+@router.post("/google")
+def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
+    try:
+        import requests
+        # We can use google-auth id_token if it's a JWT ID token, or an API call if it's an access token
+        # @react-oauth/google useGoogleLogin usually returns an access_token. Let's fetch profile using access_token
+        res = requests.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {req.token}"}
+        )
+        
+        if not res.ok:
+            raise HTTPException(status_code=401, detail="Invalid Google token")
+            
+        user_info = res.json()
+        email = user_info.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Google account has no email")
+            
+        first_name = user_info.get("given_name", "Google")
+        last_name = user_info.get("family_name", "User")
+        
+        # Check if user exists
+        existing = db.execute(
+            """SELECT id, email, role, first_name AS "firstName", last_name AS "lastName"
+               FROM users WHERE email = %s""",
+            (email,)
+        ).fetchone()
+        
+        if existing:
+            user_id = existing["id"]
+            role = existing["role"]
+            full_name = f"{existing['firstName']} {existing['lastName']}"
+        else:
+            # Auto-register Google users as STUDENT
+            import uuid
+            import string
+            import random
+            
+            # generate random password for google users
+            random_pw = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+            hashed = hash_password(random_pw)
+            role = "STUDENT"
+            
+            new_user = db.execute(
+                """INSERT INTO users (email, password_hash, role, first_name, last_name)
+                   VALUES (%s, %s, %s, %s, %s)
+                   RETURNING id""",
+                (email, hashed, role, first_name, last_name)
+            ).fetchone()
+            user_id = new_user["id"]
+            full_name = f"{first_name} {last_name}"
+            db.commit()
+            
+        token = create_token(user_id, email, role.lower())
+        
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": user_id,
+                "email": email,
+                "fullName": full_name,
+                "role": role.lower(),
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
