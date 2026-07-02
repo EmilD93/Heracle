@@ -195,7 +195,7 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
           <button
             onClick={onLogout}
             title="Sign out"
-            className="w-10 h-10 rounded-[0.75rem] flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer outline-none focus:outline-none"
+            className="w-10 h-10 rounded-[0.75rem] flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer outline-none focus:outline-none"
           >
             <LogOut size={16} strokeWidth={2.5} />
           </button>

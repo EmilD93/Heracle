@@ -207,7 +207,7 @@ export function App() {
               activeTab !== 'settings' && (
               <div
                 key="construction"
-                className="flex items-center justify-center h-full text-slate-400 flex-col gap-5"
+                className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 flex-col gap-5"
               >
                 <div className="w-20 h-20 rounded-[1.5rem] bg-white/80 dark:bg-slate-800/80 shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-center">
                   <span className="text-3xl">🚧</span>
