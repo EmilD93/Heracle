@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Any
+from datetime import datetime, timedelta
 from app.database import get_db
 
 router = APIRouter()
@@ -17,6 +18,60 @@ class EventCreate(BaseModel):
     organizer: dict
     agenda: List[dict]
     createdBy: str
+
+
+def parse_event_date(date_field: Optional[str]):
+    """Parse the frontend's combined date string, e.g.
+    "Jun 29, 2026 bullet 10:00 AM - 12:00 PM" (12h, from GET/edit round-trip) or
+    "Jun 29, 2026 bullet 14:00 - 16:00" (24h, from the Create form's <input type=time>).
+
+    Returns (start_dt, end_dt). Falls back to "tomorrow, 10am-12pm" only if the
+    field is missing or truly unparseable, so a bad date never silently
+    overrides what the organizer actually submitted.
+    """
+    fallback_start = datetime.now() + timedelta(days=1)
+    fallback_end = fallback_start + timedelta(hours=2)
+
+    if not date_field or not date_field.strip():
+        return fallback_start, fallback_end
+
+    parts = [p.strip() for p in date_field.split("\u2022")]
+    date_str = parts[0]
+    time_str = parts[1] if len(parts) > 1 else ""
+
+    def parse_time(t: str, on_date: datetime):
+        t = t.strip()
+        if not t:
+            return None
+        for fmt in ("%I:%M %p", "%H:%M"):
+            try:
+                parsed = datetime.strptime(t, fmt)
+                return on_date.replace(hour=parsed.hour, minute=parsed.minute, second=0, microsecond=0)
+            except ValueError:
+                continue
+        return None
+
+    parsed_date = None
+    for fmt in ("%b %d, %Y", "%Y-%m-%d"):
+        try:
+            parsed_date = datetime.strptime(date_str, fmt)
+            break
+        except ValueError:
+            continue
+
+    if parsed_date is None:
+        return fallback_start, fallback_end
+
+    time_parts = time_str.replace("\u2013", "-").split("-") if time_str else []
+    start_dt = parse_time(time_parts[0], parsed_date) if len(time_parts) > 0 else None
+    end_dt = parse_time(time_parts[1], parsed_date) if len(time_parts) > 1 else None
+
+    if start_dt is None:
+        start_dt = parsed_date.replace(hour=10, minute=0)
+    if end_dt is None or end_dt <= start_dt:
+        end_dt = start_dt + timedelta(hours=2)
+
+    return start_dt, end_dt
 
 @router.get("/")
 def get_events(db = Depends(get_db)):
@@ -56,26 +111,38 @@ def get_events(db = Depends(get_db)):
 
 @router.post("/")
 def create_event(event: EventCreate, db = Depends(get_db)):
+    # Basic validation with messages the frontend can surface directly
+    if not event.title or not event.title.strip():
+        raise HTTPException(status_code=400, detail="Title is required")
+    if event.capacity is None or event.capacity < 1:
+        raise HTTPException(status_code=400, detail="Event capacity must be at least 1")
+
     try:
         user = db.execute("SELECT id FROM users WHERE email = %s", (event.createdBy,)).fetchone()
         if not user:
             raise HTTPException(status_code=400, detail="User not found")
-            
+
+        start_dt, end_dt = parse_event_date(event.date)
+
         res = db.execute("""
             INSERT INTO events (title, description, capacity, status, start_time, end_time, organizer_id, image, location, category)
-            VALUES (%s, %s, %s, %s, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours', %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, (
             event.title, 
             event.description, 
             event.capacity, 
             "PUBLISHED" if event.status == "Published" else "DRAFT",
+            start_dt,
+            end_dt,
             user['id'],
             event.image,
             event.location,
             event.category
         ))
         return {"id": str(res.fetchone()['id'])}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -93,7 +160,6 @@ class EventUpdate(BaseModel):
 @router.patch("/{event_id}")
 def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
     try:
-        from datetime import datetime
         # Build dynamic query based on provided fields
         fields = []
         values = []
@@ -104,6 +170,8 @@ def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
             fields.append("description = %s")
             values.append(updates.description)
         if updates.capacity is not None:
+            if updates.capacity < 1:
+                raise HTTPException(status_code=400, detail="Event capacity must be at least 1")
             fields.append("capacity = %s")
             values.append(updates.capacity)
         if updates.status is not None:
@@ -119,20 +187,13 @@ def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
             fields.append("category = %s")
             values.append(updates.category)
         if updates.date is not None:
-            try:
-                # e.g. "Jun 29, 2026 • 10:00 AM" or "Jun 29, 2026 • 10:00 AM - 12:00 PM"
-                parts = [p.strip() for p in updates.date.split("•")]
-                date_str = parts[0]
-                time_str = parts[1] if len(parts) > 1 else "10:00 AM"
-                # Remove " - ..." or " – ..." if present
-                start_time_str = time_str.replace("–", "-").split("-")[0].strip()
-                dt = datetime.strptime(f"{date_str} {start_time_str}", "%b %d, %Y %I:%M %p")
-                fields.append("start_time = %s")
-                values.append(dt)
-                fields.append("end_time = %s")
-                values.append(dt) # just use start_time for end_time for simplicity since we don't have duration
-            except Exception as e:
-                pass
+            # Handles both "Jun 29, 2026 • 10:00 AM - 12:00 PM" (12h) and
+            # "Jun 29, 2026 • 14:00 - 16:00" (24h, from the Create/Edit form).
+            start_dt, end_dt = parse_event_date(updates.date)
+            fields.append("start_time = %s")
+            values.append(start_dt)
+            fields.append("end_time = %s")
+            values.append(end_dt)
 
 
         if not fields:
@@ -151,4 +212,35 @@ def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _set_event_status(event_id: str, new_status: str, db):
+    """Shared implementation for the publish/cancel endpoints below."""
+    try:
+        res = db.execute(
+            "UPDATE events SET status = %s WHERE id = %s RETURNING id, status",
+            (new_status, event_id),
+        )
+        row = res.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Event not found")
+        db.commit()
+        return {"id": str(row["id"]), "status": "Published" if row["status"] == "PUBLISHED" else ("Cancelled" if row["status"] == "CANCELLED" else "Draft")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{event_id}/publish")
+def publish_event(event_id: str, db = Depends(get_db)):
+    """Marks a DRAFT event as PUBLISHED so students can see and register for it."""
+    return _set_event_status(event_id, "PUBLISHED", db)
+
+
+@router.post("/{event_id}/cancel")
+def cancel_event(event_id: str, db = Depends(get_db)):
+    """Marks an event as CANCELLED so it stops accepting new registrations."""
+    return _set_event_status(event_id, "CANCELLED", db)
 

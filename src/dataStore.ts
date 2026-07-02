@@ -81,33 +81,90 @@ export function getEventById(id: string | number): EventData | undefined {
   return events.find(e => String(e.id) === String(id))
 }
 
-export async function createEvent(event: Omit<EventData, 'id' | 'registered'>): Promise<EventData | null> {
+// Every mutation below resolves to this shape so the UI can always tell
+// success from failure and show the real reason the API rejected the request
+// (e.g. "Event capacity must be at least 1", "Title is required").
+export interface ApiResult<T = undefined> {
+  ok: boolean
+  error?: string
+  data?: T
+}
+
+async function readErrorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json()
+    if (typeof body?.detail === 'string') return body.detail
+    if (Array.isArray(body?.detail) && body.detail[0]?.msg) return body.detail[0].msg
+  } catch {
+    // response wasn't JSON — fall through to the generic message
+  }
+  return fallback
+}
+
+export async function createEvent(event: Omit<EventData, 'id' | 'registered'>): Promise<ApiResult<EventData>> {
   try {
     const res = await fetch(`${API_BASE}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event)
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not create event') }
+    }
+    const created = await res.json()
     await syncWithBackend()
-    return { ...event, id: "pending", registered: 0 }
+    return { ok: true, data: { ...event, id: created.id ?? 'pending', registered: 0 } }
   } catch (err) {
     console.error('Failed to create event', err)
-    return null
+    return { ok: false, error: 'Network error — could not reach the server' }
   }
 }
 
-export async function updateEvent(id: string, updates: Partial<EventData>) {
+export async function updateEvent(id: string, updates: Partial<EventData>): Promise<ApiResult> {
   try {
     const res = await fetch(`${API_BASE}/events/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
     })
-    if (!res.ok) return
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not update event') }
+    }
     await syncWithBackend()
+    return { ok: true }
   } catch (err) {
     console.error('Failed to update event', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+// Dedicated publish/cancel actions (POST /events/{id}/publish and /cancel).
+// These map straight to the organizer dashboard's Publish/Cancel buttons.
+export async function publishEvent(id: string): Promise<ApiResult> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${id}/publish`, { method: 'POST' })
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not publish event') }
+    }
+    await syncWithBackend()
+    return { ok: true }
+  } catch (err) {
+    console.error('Failed to publish event', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function cancelEvent(id: string): Promise<ApiResult> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${id}/cancel`, { method: 'POST' })
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not cancel event') }
+    }
+    await syncWithBackend()
+    return { ok: true }
+  } catch (err) {
+    console.error('Failed to cancel event', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
   }
 }
 
