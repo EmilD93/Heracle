@@ -4,8 +4,8 @@
 
 -- 1. Seed Users (1 Organizer, 3 Students)
 INSERT INTO users (id, email, password_hash, role, first_name, last_name) VALUES
-('11111111-1111-1111-1111-111111111111', 'organizer@heracle.com', 'hashed_password_123', 'ORGANIZER', 'Ivan', 'Ivanov'),
-('22222222-2222-2222-2222-222222222222', 'student1@heracle.com', 'hashed_password_123', 'STUDENT', 'Maria', 'Georgieva'),
+('11111111-1111-1111-1111-111111111111', 'organizer@university.edu', 'hashed_password_123', 'ORGANIZER', 'Ivan', 'Ivanov'),
+('22222222-2222-2222-2222-222222222222', 'student@university.edu', 'hashed_password_123', 'STUDENT', 'Maria', 'Georgieva'),
 ('33333333-3333-3333-3333-333333333333', 'student2@heracle.com', 'hashed_password_123', 'STUDENT', 'Petar', 'Petrov'),
 ('44444444-4444-4444-4444-444444444444', 'student3@heracle.com', 'hashed_password_123', 'STUDENT', 'Elena', 'Dimitrova');
 

@@ -4,6 +4,7 @@ from typing import List, Optional, Any
 from datetime import datetime, timedelta
 from app.database import get_db
 from app.services.notification_service import create_notification_job
+from app.routers.auth import require_organizer
 
 router = APIRouter()
 
@@ -193,7 +194,7 @@ def get_event(event_id: str, db=Depends(get_db)):
     return serialize_event(row)
 
 @router.post("/")
-def create_event(event: EventCreate, db = Depends(get_db)):
+def create_event(event: EventCreate, current_user=Depends(require_organizer), db = Depends(get_db)):
     # Basic validation with messages the frontend can surface directly
     if not event.title or not event.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
@@ -242,7 +243,7 @@ class EventUpdate(BaseModel):
     date: Optional[str] = None
 
 @router.patch("/{event_id}")
-def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
+def update_event(event_id: str, updates: EventUpdate, current_user=Depends(require_organizer), db = Depends(get_db)):
     try:
         # Build dynamic query based on provided fields
         fields = []
@@ -353,13 +354,13 @@ def _set_event_status(event_id: str, new_status: str, db):
 
 
 @router.post("/{event_id}/publish")
-def publish_event(event_id: str, db = Depends(get_db)):
+def publish_event(event_id: str, current_user=Depends(require_organizer), db = Depends(get_db)):
     """Marks a DRAFT event as PUBLISHED so students can see and register for it."""
     return _set_event_status(event_id, "PUBLISHED", db)
 
 
 @router.post("/{event_id}/cancel")
-def cancel_event(event_id: str, db = Depends(get_db)):
+def cancel_event(event_id: str, current_user=Depends(require_organizer), db = Depends(get_db)):
     """Marks an event as CANCELLED so it stops accepting new registrations."""
     return _set_event_status(event_id, "CANCELLED", db)
 

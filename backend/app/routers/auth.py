@@ -12,6 +12,42 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # JWT config — добави JWT_SECRET в .env за продукция!
 # ---------------------------------------------------------------------------
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        # Verify user still exists in DB
+        user = db.execute(
+            """SELECT id, email, role, first_name, last_name, profile_photo_url 
+               FROM users WHERE id = %s""",
+            (user_id_str,)
+        ).fetchone()
+        
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+def require_organizer(current_user = Depends(get_current_user)):
+    if current_user["role"].lower() != "organizer":
+        raise HTTPException(status_code=403, detail="Forbidden: Organizer role required")
+    return current_user
+
+def require_student(current_user = Depends(get_current_user)):
+    if current_user["role"].lower() != "student":
+        raise HTTPException(status_code=403, detail="Forbidden: Student role required")
+    return current_user
+
 JWT_SECRET = os.getenv("JWT_SECRET", "heracle_dev_secret_change_in_prod")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24 * 7  # 7 дни
@@ -70,6 +106,20 @@ def ensure_user_profile_columns(db):
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@router.get("/users/me")
+def get_me(current_user=Depends(get_current_user)):
+    return {
+        "ok": True,
+        "user": {
+            "id": str(current_user["id"]),
+            "email": current_user["email"],
+            "role": current_user["role"].lower(),
+            "fullName": f"{current_user['first_name']} {current_user['last_name']}",
+            "profilePhotoUrl": current_user.get("profile_photo_url") or "",
+        }
+    }
+
 @router.post("/login")
 def login(req: LoginRequest, db=Depends(get_db)):
     ensure_user_profile_columns(db)
