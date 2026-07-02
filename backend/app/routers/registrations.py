@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 from app.database import get_db
-from app.services.notification_service import create_notification_job
+from app.services.registration_service import register_student_for_event, cancel_registration
 
 router = APIRouter()
 
@@ -15,87 +14,52 @@ def register(event_id: str, req: RegistrationRequest, db = Depends(get_db)):
         user = db.execute("SELECT id FROM users WHERE email = %s", (req.userEmail,)).fetchone()
         if not user:
             raise HTTPException(status_code=400, detail="User not found")
-        user_id = user['id']
 
-        event = db.execute("SELECT id, capacity FROM events WHERE id = %s", (event_id,)).fetchone()
-        if not event:
-            raise HTTPException(status_code=404, detail="Event not found")
-
-        # Check existing registration
-        existing = db.execute(
-            "SELECT id, status FROM registrations WHERE student_id = %s AND event_id = %s AND status != 'CANCELLED'",
-            (user_id, event_id)
-        ).fetchone()
-
-        if existing:
-            raise HTTPException(status_code=400, detail="Already registered")
-
-        # Count confirmed
-        confirmed = db.execute(
-            "SELECT COUNT(*) as count FROM registrations WHERE event_id = %s AND status = 'CONFIRMED'",
-            (event_id,)
-        ).fetchone()
-
-        is_full = confirmed['count'] >= event['capacity']
-        status = 'WAITLISTED' if is_full else 'CONFIRMED'
-
-        # Get max position
-        max_pos = db.execute(
-            "SELECT MAX(position) as m FROM registrations WHERE event_id = %s",
-            (event_id,)
-        ).fetchone()
-        position = (max_pos['m'] or 0) + 1
-
-        reg = db.execute("""
-            INSERT INTO registrations (student_id, event_id, status, position)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, status, position, created_at
-        """, (user_id, event_id, status, position)).fetchone()
-
-        notification_type = (
-            "RegistrationWaitlisted"
-            if status == "WAITLISTED"
-            else "RegistrationConfirmed"
+        service_result = register_student_for_event(
+            db,
+            student_id=str(user["id"]),
+            event_id=event_id,
         )
-
-        notification_message = (
-            "You have been added to the waitlist."
-            if status == "WAITLISTED"
-            else "Your registration has been confirmed."
-        )
-
-        notification_job_id = create_notification_job(
-            db=db,
-            notification_type=notification_type,
-            user_id=str(user_id),
-            event_id=str(event_id),
-            registration_id=str(reg["id"]),
-            payload={
-                "message": notification_message,
-                "registration_id": str(reg["id"]),
-                "event_id": str(event_id),
-                "student_id": str(user_id),
-                "status": status,
-            },
-        )
-
-        db.commit()
 
         return {
             "ok": True,
             "registration": {
-                "id": str(reg["id"]),
+                "id": service_result["registration_id"],
                 "userEmail": req.userEmail,
-                "eventId": event_id,
-                "status": reg["status"],
-                "position": reg["position"],
-                "createdAt": str(reg["created_at"]),
+                "eventId": service_result["event_id"],
+                "status": service_result["status"],
+                "position": service_result["position"],
+                "createdAt": service_result["created_at"],
             },
-            "notificationJobId": str(notification_job_id),
+            "notificationJobId": service_result["notification_job_id"],
         }
+    except ValueError as e:
+        message = str(e)
+        if message == "Event not found":
+            raise HTTPException(status_code=404, detail=message)
+        raise HTTPException(status_code=400, detail=message)
     except HTTPException:
-        db.rollback()
         raise
     except Exception as e:
-        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{registration_id}")
+def delete_registration(registration_id: str, db=Depends(get_db)):
+    try:
+        result = cancel_registration(db, registration_id=registration_id)
+        return {
+            "ok": True,
+            "cancelledRegistrationId": result["cancelled_registration_id"],
+            "status": result["status"],
+            "promotedRegistration": result["promoted_registration"],
+        }
+    except ValueError as e:
+        message = str(e)
+        if message == "Registration not found":
+            raise HTTPException(status_code=404, detail=message)
+        raise HTTPException(status_code=400, detail=message)
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
