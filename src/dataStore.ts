@@ -55,15 +55,17 @@ export function initializeDataStore() {
 // ─── Events CRUD ──────────────────────────────────────────────────────────────
 
 // We still use localStorage as a cache, but we sync it with the backend.
-export async function syncWithBackend() {
+// Returns true on success so callers can drive loading/error UI states.
+export async function syncWithBackend(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/events`)
-    if (res.ok) {
-      const events = await res.json()
-      localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
-    }
+    if (!res.ok) return false
+    const events = await res.json()
+    localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
+    return true
   } catch (err) {
     console.error('Failed to sync events with backend', err)
+    return false
   }
 }
 

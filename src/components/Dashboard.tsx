@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { EventCard } from './EventCard'
-import { Bell, Search, SlidersHorizontal } from 'lucide-react'
+import { Bell, Search, SlidersHorizontal, AlertTriangle, RefreshCw } from 'lucide-react'
 import { cn } from '../utils/cn'
 import { getAllEvents } from '../dataStore'
 
@@ -18,9 +18,12 @@ interface DashboardProps {
   userEmail: string
   onEventSelect: (id: string) => void
   onDataChange: () => void
+  isLoading?: boolean
+  loadError?: boolean
+  onRetry?: () => void
 }
 
-export function Dashboard({ userEmail, onEventSelect, onDataChange }: DashboardProps) {
+export function Dashboard({ userEmail, onEventSelect, onDataChange, isLoading, loadError, onRetry }: DashboardProps) {
   const EVENTS = getAllEvents()
   const [activeFilter, setActiveFilter] = useState<string>('All Events')
   const [query, setQuery] = useState('')
@@ -109,7 +112,33 @@ export function Dashboard({ userEmail, onEventSelect, onDataChange }: DashboardP
         })}
       </div>
 
-      {visibleEvents.length > 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-10">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[26rem] rounded-[2rem] bg-white/60 border border-slate-100/80 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-[1.5rem] bg-red-50 border border-red-100 shadow-sm flex items-center justify-center mb-5">
+            <AlertTriangle size={26} className="text-red-400" strokeWidth={2.5} />
+          </div>
+          <p className="text-lg font-bold text-slate-600">Couldn't load events</p>
+          <p className="text-slate-400 font-medium mt-1 mb-6">
+            We couldn't reach the server. Check your connection and try again.
+          </p>
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-[1rem] text-sm font-bold bg-slate-800 text-white shadow-md shadow-slate-800/20 hover:bg-slate-900 transition-colors"
+          >
+            <RefreshCw size={15} strokeWidth={2.5} />
+            Retry
+          </button>
+        </div>
+      ) : visibleEvents.length > 0 ? (
         <motion.div
           layout
           className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-10"

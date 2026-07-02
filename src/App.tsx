@@ -9,7 +9,7 @@ import { CreateEventForm } from './components/CreateEventForm'
 import { LoginPage } from './components/Loginpage.tsx'
 import { RegisterPage } from './components/RegisterPage'
 import { useScreenInit } from './useScreenInit.js'
-import { initializeDataStore } from './dataStore'
+import { initializeDataStore, syncWithBackend } from './dataStore'
 import type { UserAccount } from './authStore'
 import { clearAuth } from './authStore'
 
@@ -39,11 +39,20 @@ export function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const refresh = () => setRefreshKey(k => k + 1)
 
-  React.useEffect(() => {
-    import('./dataStore').then(({ syncWithBackend }) => {
-      syncWithBackend().then(refresh)
+  // Events sync status — drives the loading/error states shown on the Dashboard
+  const [eventsStatus, setEventsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  const loadEvents = React.useCallback(() => {
+    setEventsStatus('loading')
+    syncWithBackend().then(ok => {
+      setEventsStatus(ok ? 'ready' : 'error')
+      refresh()
     })
   }, [])
+
+  React.useEffect(() => {
+    loadEvents()
+  }, [loadEvents])
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
@@ -121,7 +130,15 @@ export function App() {
         <div className="relative z-10 h-full flex flex-col">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && !selectedEventId && (
-              <Dashboard key={`dashboard-${refreshKey}`} userEmail={userEmail} onEventSelect={setSelectedEventId} onDataChange={refresh} />
+              <Dashboard
+                key={`dashboard-${refreshKey}`}
+                userEmail={userEmail}
+                onEventSelect={setSelectedEventId}
+                onDataChange={refresh}
+                isLoading={eventsStatus === 'loading'}
+                loadError={eventsStatus === 'error'}
+                onRetry={loadEvents}
+              />
             )}
             {activeTab === 'dashboard' && selectedEventId && (
               <EventDetails

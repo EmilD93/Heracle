@@ -30,6 +30,8 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
       ? existingReg.status === 'CONFIRMED' ? 'registered' : 'waitlisted'
       : 'idle',
   )
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!event) return null
 
@@ -37,9 +39,15 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
   const percentage = Math.min(100, (registered / event.capacity) * 100)
 
   const handleAction = async () => {
-    if (status !== 'idle') return
+    if (status !== 'idle' || isSubmitting) return
+    setError(null)
+    setIsSubmitting(true)
     const result = await registerForEvent(userEmail, eventId)
-    if (!result.ok) return
+    setIsSubmitting(false)
+    if (!result.ok) {
+      setError(result.error || 'Registration failed')
+      return
+    }
 
     if (result.registration.status === 'CONFIRMED') {
       setStatus('registered')
@@ -55,9 +63,11 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
       ? 'Registered'
       : status === 'waitlisted'
         ? 'On Waitlist'
-        : isFull
-          ? 'Join Waitlist'
-          : 'Register Now'
+        : isSubmitting
+          ? 'Registering…'
+          : isFull
+            ? 'Join Waitlist'
+            : 'Register Now'
   const isDone = status !== 'idle'
 
   return (
@@ -202,17 +212,19 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
 
                 <motion.button
                   onClick={handleAction}
-                  disabled={isDone}
-                  whileTap={{ scale: isDone ? 1 : 0.97 }}
+                  disabled={isDone || isSubmitting}
+                  whileTap={{ scale: isDone || isSubmitting ? 1 : 0.97 }}
                   className={cn(
                     'w-full py-4 rounded-[1.25rem] font-bold text-[16px] transition-colors duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2',
                     status === 'registered'
                       ? 'bg-emerald-50 text-emerald-700 cursor-default'
                       : status === 'waitlisted'
                         ? 'bg-amber-100 text-amber-800 cursor-default'
-                        : isFull
-                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700',
+                        : isSubmitting
+                          ? 'bg-blue-400 text-white/80 cursor-not-allowed'
+                          : isFull
+                            ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700',
                   )}
                 >
                   {status === 'registered' && (
@@ -223,6 +235,9 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
                   )}
                   {buttonLabel}
                 </motion.button>
+                {error && (
+                  <p className="mt-3 text-sm font-semibold text-red-500 text-center">{error}</p>
+                )}
               </div>
             </section>
 

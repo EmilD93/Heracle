@@ -37,13 +37,21 @@ export function EventCard({
       ? existingReg.status === 'CONFIRMED' ? 'registered' : 'waitlisted'
       : 'idle',
   )
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const isFull = registered >= capacity
   const percentage = Math.min(100, (registered / capacity) * 100)
   const handleAction = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (status !== 'idle' || !userEmail) return
+    if (status !== 'idle' || !userEmail || isSubmitting) return
+    setError(null)
+    setIsSubmitting(true)
     const result = await registerForEvent(userEmail, id)
-    if (!result.ok) return
+    setIsSubmitting(false)
+    if (!result.ok) {
+      setError(result.error || 'Registration failed')
+      return
+    }
 
     if (result.registration.status === 'CONFIRMED') {
       setStatus('registered')
@@ -58,9 +66,11 @@ export function EventCard({
       ? 'Registered'
       : status === 'waitlisted'
         ? 'On Waitlist'
-        : isFull
-          ? 'Join Waitlist'
-          : 'Register Now'
+        : isSubmitting
+          ? 'Registering…'
+          : isFull
+            ? 'Join Waitlist'
+            : 'Register Now'
   const isDone = status !== 'idle'
   return (
     <motion.article
@@ -157,9 +167,9 @@ export function EventCard({
 
           <motion.button
             onClick={handleAction}
-            disabled={isDone}
+            disabled={isDone || isSubmitting}
             whileTap={{
-              scale: isDone ? 1 : 0.97,
+              scale: isDone || isSubmitting ? 1 : 0.97,
             }}
             aria-label={`${buttonLabel}: ${title}`}
             className={cn(
@@ -168,15 +178,22 @@ export function EventCard({
                 ? 'bg-emerald-50 text-emerald-700 cursor-default'
                 : status === 'waitlisted'
                   ? 'bg-amber-100 text-amber-800 cursor-default'
-                  : isFull
-                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700',
+                  : isSubmitting
+                    ? 'bg-blue-400 text-white/80 cursor-not-allowed'
+                    : isFull
+                      ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700',
             )}
           >
             {status === 'registered' && <Check size={18} strokeWidth={3} />}
             {status === 'waitlisted' && <Clock size={18} strokeWidth={2.5} />}
             {buttonLabel}
           </motion.button>
+          {error && (
+            <p className="text-xs font-semibold text-red-500 text-center" onClick={(e) => e.stopPropagation()}>
+              {error}
+            </p>
+          )}
         </div>
       </div>
     </motion.article>
