@@ -6,6 +6,22 @@ from app.database import get_db
 
 router = APIRouter()
 
+
+def map_event_status(db_status: str) -> str:
+    if db_status == "PUBLISHED":
+        return "Published"
+    if db_status == "CANCELLED":
+        return "Cancelled"
+    return "Draft"
+
+
+def map_event_status_to_db(api_status: str) -> str:
+    if api_status == "Published":
+        return "PUBLISHED"
+    if api_status == "Cancelled":
+        return "CANCELLED"
+    return "DRAFT"
+
 class EventCreate(BaseModel):
     title: str
     description: str
@@ -73,6 +89,34 @@ def parse_event_date(date_field: Optional[str]):
 
     return start_dt, end_dt
 
+
+def serialize_event(row):
+    start_t = row['start_time'].strftime("%b %d, %Y")
+    start_h = row['start_time'].strftime("%I:%M %p")
+
+    organizer_name = None
+    if row.get('first_name') and row.get('last_name'):
+        organizer_name = f"{row['first_name']} {row['last_name']}"
+
+    return {
+        "id": str(row['id']),
+        "title": row['title'],
+        "description": row['description'],
+        "date": f"{start_t} • {start_h}",
+        "capacity": row['capacity'],
+        "registered": row['registered'],
+        "category": row.get('category') or "Academic",
+        "status": map_event_status(row['status']),
+        "location": row.get('location') or "Main Campus",
+        "image": row.get('image') or "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000",
+        "organizer": {
+            "name": organizer_name or "Unknown Organizer",
+            "email": row.get('org_email') or "",
+            "phone": ""
+        },
+        "agenda": []
+    }
+
 @router.get("/")
 def get_events(db = Depends(get_db)):
     events = db.execute("""
@@ -83,31 +127,31 @@ def get_events(db = Depends(get_db)):
         LEFT JOIN users u ON e.organizer_id = u.id
     """).fetchall()
 
-    # Map database row format to frontend format
-    result = []
-    for row in events:
-        start_t = row['start_time'].strftime("%b %d, %Y")
-        start_h = row['start_time'].strftime("%I:%M %p")
-        
-        result.append({
-            "id": str(row['id']),
-            "title": row['title'],
-            "description": row['description'],
-            "date": f"{start_t} • {start_h}",
-            "capacity": row['capacity'],
-            "registered": row['registered'],
-            "category": row.get('category') or "Academic",
-            "status": "Published" if row['status'] == 'PUBLISHED' else "Draft",
-            "location": row.get('location') or "Main Campus",
-            "image": row.get('image') or "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000",
-            "organizer": {
-                "name": f"{row['first_name']} {row['last_name']}",
-                "email": row['org_email'],
-                "phone": ""
-            },
-            "agenda": []
-        })
-    return result
+    return [serialize_event(row) for row in events]
+
+
+@router.get("/{event_id}")
+def get_event(event_id: str, db=Depends(get_db)):
+    row = db.execute(
+        """
+        SELECT e.*,
+               u.first_name, u.last_name, u.email AS org_email,
+               (
+                   SELECT count(*)
+                   FROM registrations r
+                   WHERE r.event_id = e.id AND r.status = 'CONFIRMED'
+               ) AS registered
+        FROM events e
+        LEFT JOIN users u ON e.organizer_id = u.id
+        WHERE e.id = %s
+        """,
+        (event_id,),
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return serialize_event(row)
 
 @router.post("/")
 def create_event(event: EventCreate, db = Depends(get_db)):
@@ -132,7 +176,7 @@ def create_event(event: EventCreate, db = Depends(get_db)):
             event.title, 
             event.description, 
             event.capacity, 
-            "PUBLISHED" if event.status == "Published" else "DRAFT",
+            map_event_status_to_db(event.status),
             start_dt,
             end_dt,
             user['id'],
@@ -140,6 +184,7 @@ def create_event(event: EventCreate, db = Depends(get_db)):
             event.location,
             event.category
         ))
+        db.commit()
         return {"id": str(res.fetchone()['id'])}
     except HTTPException:
         raise
@@ -176,7 +221,7 @@ def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
             values.append(updates.capacity)
         if updates.status is not None:
             fields.append("status = %s")
-            values.append("PUBLISHED" if updates.status == "Published" else ("CANCELLED" if updates.status == "Cancelled" else "DRAFT"))
+            values.append(map_event_status_to_db(updates.status))
         if updates.image is not None:
             fields.append("image = %s")
             values.append(updates.image)
