@@ -10,11 +10,13 @@ import {
   Clock,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { getAllEvents, updateEvent } from '../dataStore'
+import { getAllEvents, publishEvent, cancelEvent } from '../dataStore'
 import { RegistrationsChart } from './RegistrationsChart'
+import { useState } from 'react'
 
 export function OrganizerDashboard({ setActiveTab, onDataChange, onEditEvent }: { setActiveTab: (tab: string) => void, onDataChange?: () => void, onEditEvent?: (id: string) => void }) {
   const EVENTS = getAllEvents()
+  const [error, setError] = useState<string | null>(null)
   const totalRegs = EVENTS.reduce((sum, e) => sum + e.registered, 0)
   const stats = [
     {
@@ -38,13 +40,23 @@ export function OrganizerDashboard({ setActiveTab, onDataChange, onEditEvent }: 
   ]
 
   const handlePublish = async (id: string) => {
-    await updateEvent(id, { status: 'Published' })
+    setError(null)
+    const result = await publishEvent(id)
+    if (!result.ok) {
+      setError(result.error || 'Could not publish event')
+      return
+    }
     onDataChange?.()
   }
 
   const handleCancel = async (id: string) => {
     if (!confirm('Are you sure you want to cancel this event?')) return
-    await updateEvent(id, { status: 'Cancelled' })
+    setError(null)
+    const result = await cancelEvent(id)
+    if (!result.ok) {
+      setError(result.error || 'Could not cancel event')
+      return
+    }
     onDataChange?.()
   }
 
@@ -55,6 +67,13 @@ export function OrganizerDashboard({ setActiveTab, onDataChange, onEditEvent }: 
       exit={{ opacity: 0, y: -20 }}
       className="flex-1 h-full overflow-y-auto px-10 py-8 hide-scrollbar relative z-10"
     >
+      {error && (
+        <div className="mb-6 px-5 py-3.5 rounded-[1.25rem] bg-red-50 border border-red-100 text-red-700 font-bold text-[14px] flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 focus:outline-none">✕</button>
+        </div>
+      )}
+
       <header className="flex items-center justify-between mb-12">
         <div>
           <h1 className="text-4xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight mb-2">

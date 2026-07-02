@@ -121,17 +121,19 @@ function Section({
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
-function Toast({ message, type }: { message: string; type: 'success' | 'draft' }) {
+function Toast({ message, type }: { message: string; type: 'success' | 'draft' | 'error' }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.96 }}
       className={cn(
-        'fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-[1.25rem] shadow-xl font-bold text-[15px] flex items-center gap-2.5',
+        'fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-[1.25rem] shadow-xl font-bold text-[15px] flex items-center gap-2.5 max-w-md text-center',
         type === 'success'
           ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
-          : 'bg-slate-800 text-white',
+          : type === 'error'
+            ? 'bg-red-600 text-white'
+            : 'bg-slate-800 text-white',
       )}
     >
       {type === 'success' ? <Send size={17} strokeWidth={2.5} /> : <Save size={17} strokeWidth={2.5} />}
@@ -189,9 +191,10 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
       ? existingEvent.agenda.map((a: { time?: string; activity?: string }) => ({ id: Math.random().toString(36).substring(2), time: a.time || '', activity: a.activity || '' }))
       : [{ id: Math.random().toString(36).substring(2), time: '', activity: '' }],
   })
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'draft' } | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'draft' | 'error' } | null>(null)
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
+  const [submitting, setSubmitting] = useState(false)
 
   const set = (field: keyof FormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }))
@@ -226,7 +229,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
     return Object.keys(e).length === 0
   }
 
-  const showToast = (message: string, type: 'success' | 'draft') => {
+  const showToast = (message: string, type: 'success' | 'draft' | 'error') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)
   }
@@ -263,25 +266,43 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
 
   const handlePublish = async () => {
     if (!validate()) return
-    if (eventIdToEdit) {
-      await updateEvent(eventIdToEdit, buildEventData('Published'))
-      showToast('Event updated!', 'success')
-    } else {
-      await createEvent(buildEventData('Published'))
-      showToast('Event published!', 'success')
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      const result = eventIdToEdit
+        ? await updateEvent(eventIdToEdit, buildEventData('Published'))
+        : await createEvent(buildEventData('Published'))
+
+      if (!result.ok) {
+        showToast(result.error || 'Could not save event', 'error')
+        return
+      }
+      showToast(eventIdToEdit ? 'Event updated!' : 'Event published!', 'success')
+      setTimeout(() => onBack(), 1200)
+    } finally {
+      setSubmitting(false)
     }
-    setTimeout(() => onBack(), 1200)
   }
 
   const handleSaveDraft = async () => {
-    if (eventIdToEdit) {
-      await updateEvent(eventIdToEdit, buildEventData('Draft'))
-      showToast('Draft updated', 'draft')
-    } else {
-      await createEvent(buildEventData('Draft'))
-      showToast('Saved as draft', 'draft')
+    // Drafts are allowed to be incomplete — only title/capacity are enforced,
+    // and the backend will send back a clear error if those are missing.
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      const result = eventIdToEdit
+        ? await updateEvent(eventIdToEdit, buildEventData('Draft'))
+        : await createEvent(buildEventData('Draft'))
+
+      if (!result.ok) {
+        showToast(result.error || 'Could not save event', 'error')
+        return
+      }
+      showToast(eventIdToEdit ? 'Draft updated' : 'Saved as draft', 'draft')
+      setTimeout(() => onBack(), 1200)
+    } finally {
+      setSubmitting(false)
     }
-    setTimeout(() => onBack(), 1200)
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,17 +341,19 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
           <div className="flex items-center gap-3">
             <button
               onClick={handleSaveDraft}
-              className="flex items-center gap-2 px-5 py-3 bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 rounded-[1.25rem] font-bold text-[14px] hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm focus:outline-none"
+              disabled={submitting}
+              className="flex items-center gap-2 px-5 py-3 bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 rounded-[1.25rem] font-bold text-[14px] hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save size={17} strokeWidth={2.5} />
-              Save draft
+              {submitting ? 'Saving…' : 'Save draft'}
             </button>
             <button
               onClick={handlePublish}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[1.25rem] font-bold text-[14px] shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-[0.98] focus:outline-none"
+              disabled={submitting}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[1.25rem] font-bold text-[14px] shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-[0.98] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send size={17} strokeWidth={2.5} />
-              Publish event
+              {submitting ? 'Publishing…' : 'Publish event'}
             </button>
           </div>
         </div>
@@ -503,7 +526,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     value={form.location}
                     onChange={(e) => set('location', e.target.value)}
                   />
-                  {errors.location && <p className="mt-1.5 text-xs font-bold text-red-500">{errors.location}</p>}
+                  {errors.location && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.location}</p>}
                 </div>
                 <div>
                   <Label required>Capacity</Label>
@@ -585,14 +608,16 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
               </p>
               <button
                 onClick={handlePublish}
-                className="w-full py-3.5 bg-white text-blue-600 rounded-[1.25rem] font-bold text-[15px] hover:bg-blue-50 transition-colors shadow-sm focus:outline-none flex items-center justify-center gap-2"
+                disabled={submitting}
+                className="w-full py-3.5 bg-white text-blue-600 rounded-[1.25rem] font-bold text-[15px] hover:bg-blue-50 transition-colors shadow-sm focus:outline-none flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Send size={17} strokeWidth={2.5} />
-                Publish event
+                {submitting ? 'Publishing…' : 'Publish event'}
               </button>
               <button
                 onClick={handleSaveDraft}
-                className="w-full mt-3 py-3 text-blue-100 hover:text-white rounded-[1.25rem] font-bold text-[14px] transition-colors focus:outline-none"
+                disabled={submitting}
+                className="w-full mt-3 py-3 text-blue-100 hover:text-white rounded-[1.25rem] font-bold text-[14px] transition-colors focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Save as draft instead
               </button>
