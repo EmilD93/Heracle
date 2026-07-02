@@ -5,6 +5,7 @@ export interface UserAccount {
   fullName: string
   email: string
   role: 'student' | 'organizer'
+  profilePhotoUrl?: string
 }
 
 const TOKEN_KEY = 'heracle_jwt'
@@ -45,6 +46,7 @@ export async function loginWithGoogle(token: string): Promise<{ ok: true; user: 
       fullName: data.user.fullName || data.user.email.split('@')[0],
       email: data.user.email,
       role: normalizedRole,
+      profilePhotoUrl: data.user.profilePhotoUrl || '',
     }
     localStorage.setItem('auth_user', JSON.stringify(user))
     
@@ -98,6 +100,7 @@ export async function loginUser(
       fullName: data.user.fullName,
       email: data.user.email,
       role: data.user.role,
+      profilePhotoUrl: data.user.profilePhotoUrl || '',
     }
     localStorage.setItem(USER_KEY, JSON.stringify(user))
 
@@ -134,6 +137,7 @@ export async function registerUser(
       fullName: data.user.fullName,
       email: data.user.email,
       role: data.user.role,
+      profilePhotoUrl: data.user.profilePhotoUrl || '',
     }
     localStorage.setItem(USER_KEY, JSON.stringify(newUser))
 

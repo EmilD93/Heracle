@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { EventCard } from './EventCard'
-import { Bell, BellOff, Check, Search, SlidersHorizontal, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Bell, BellOff, Check, Search, SlidersHorizontal, AlertTriangle, RefreshCw, Clock3, CircleCheckBig } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { getAllEvents } from '../dataStore'
+import { getAllEvents, getUserNotifications, markUserNotificationsSeen } from '../dataStore'
 
 const FILTERS = [
   'All Events',
@@ -38,6 +38,35 @@ export function Dashboard({ userEmail, onEventSelect, onDataChange, isLoading, l
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('all')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Array<{ id: string; type: string; status: string; eventTitle?: string; message?: string; seenAt?: string | null }>>([])
+
+  const loadNotifications = () => {
+    getUserNotifications(userEmail).then(result => {
+      if (!result.ok) return
+      setNotifications(result.data || [])
+    })
+  }
+
+  useEffect(() => {
+    loadNotifications()
+  }, [userEmail])
+
+  const unreadCount = notifications.filter(note => !note.seenAt).length
+
+  const openNotifications = () => {
+    const shouldOpen = !isNotificationsOpen
+    setIsNotificationsOpen(shouldOpen)
+    setIsFilterOpen(false)
+
+    if (!shouldOpen || unreadCount === 0) return
+
+    const seenAt = new Date().toISOString()
+    setNotifications(prev => prev.map(note => (note.seenAt ? note : { ...note, seenAt })))
+
+    markUserNotificationsSeen(userEmail).then(result => {
+      if (result.ok) loadNotifications()
+    })
+  }
 
   const visibleEvents = EVENTS.filter((event) => {
     if (event.status !== 'Published') return false
@@ -148,12 +177,17 @@ export function Dashboard({ userEmail, onEventSelect, onDataChange, isLoading, l
 
           <div className="relative">
             <button
-              onClick={() => { setIsNotificationsOpen(o => !o); setIsFilterOpen(false) }}
+              onClick={openNotifications}
               aria-expanded={isNotificationsOpen}
               aria-label="Notifications"
               className="relative p-3.5 bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 rounded-[1.25rem] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all shadow-sm focus:outline-none"
             >
               <Bell size={22} strokeWidth={2.5} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {Math.min(9, unreadCount)}
+                </span>
+              )}
             </button>
             <AnimatePresence>
               {isNotificationsOpen && (
@@ -166,18 +200,45 @@ export function Dashboard({ userEmail, onEventSelect, onDataChange, isLoading, l
                     transition={{ duration: 0.15 }}
                     className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-800 rounded-[1.25rem] border border-slate-100 dark:border-slate-700 shadow-xl shadow-slate-900/10 z-50 overflow-hidden"
                   >
-                    <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+                    <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
                       <h3 className="text-[15px] font-bold text-slate-800 dark:text-slate-100">Notifications</h3>
+                      <button
+                        onClick={loadNotifications}
+                        className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                      >
+                        Refresh
+                      </button>
                     </div>
-                    <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                      <div className="w-12 h-12 rounded-[1rem] bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 flex items-center justify-center mb-3">
-                        <BellOff size={20} className="text-slate-300 dark:text-slate-600" strokeWidth={2.5} />
+                    {notifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                        <div className="w-12 h-12 rounded-[1rem] bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 flex items-center justify-center mb-3">
+                          <BellOff size={20} className="text-slate-300 dark:text-slate-600" strokeWidth={2.5} />
+                        </div>
+                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No notifications yet</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          We'll let you know about registration updates here.
+                        </p>
                       </div>
-                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No notifications yet</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                        We'll let you know about registration updates here.
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                        {notifications.map((note) => (
+                          <div key={note.id} className="px-5 py-3.5 flex items-start gap-3">
+                            <div className={cn(
+                              'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                              note.status === 'completed'
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                            )}>
+                              {note.status === 'completed' ? <CircleCheckBig size={14} /> : <Clock3 size={14} />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{note.eventTitle || note.type}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{note.message || note.type}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </motion.div>
                 </>
               )}

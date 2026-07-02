@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Calendar, Check, Clock } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { getEventById, getUserRegistrationForEvent, registerForEvent } from '../dataStore'
+import { fetchUserRegistrationForEvent, getEventById, getUserRegistrationForEvent, registerForEvent, unregisterFromEvent } from '../dataStore'
 interface EventCardProps {
   id: string
   title: string
@@ -39,39 +39,66 @@ export function EventCard({
   )
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const isOwner = Boolean(userEmail && currentEvent?.organizer?.email === userEmail)
+
+  React.useEffect(() => {
+    if (!userEmail) return
+    fetchUserRegistrationForEvent(userEmail, id).then(result => {
+      if (!result.ok) return
+      const reg = result.data
+      if (!reg) {
+        setStatus('idle')
+        return
+      }
+      setStatus(reg.status === 'CONFIRMED' ? 'registered' : 'waitlisted')
+    })
+  }, [id, userEmail])
   const isFull = registered >= capacity
   const percentage = Math.min(100, (registered / capacity) * 100)
   const handleAction = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (status !== 'idle' || !userEmail || isSubmitting) return
+    if (!userEmail || isSubmitting || isOwner) return
     setError(null)
     setIsSubmitting(true)
-    const result = await registerForEvent(userEmail, id)
-    setIsSubmitting(false)
-    if (!result.ok) {
-      setError(result.error || 'Registration failed')
-      return
-    }
+    if (status === 'idle') {
+      const result = await registerForEvent(userEmail, id)
+      setIsSubmitting(false)
+      if (!result.ok) {
+        setError(result.error || 'Registration failed')
+        return
+      }
 
-    if (result.registration.status === 'CONFIRMED') {
-      setStatus('registered')
-      setRegistered((r) => r + 1)
+      if (result.registration.status === 'CONFIRMED') {
+        setStatus('registered')
+        setRegistered((r) => r + 1)
+      } else {
+        setStatus('waitlisted')
+      }
     } else {
-      setStatus('waitlisted')
+      const result = await unregisterFromEvent(userEmail, id)
+      setIsSubmitting(false)
+      if (!result.ok) {
+        setError(result.error || 'Could not leave event')
+        return
+      }
+      if (status === 'registered') setRegistered((r) => Math.max(0, r - 1))
+      setStatus('idle')
     }
     if (onDataChange) onDataChange()
   }
   const buttonLabel =
-    status === 'registered'
-      ? 'Registered'
+    isOwner
+      ? 'Your Event'
+      : status === 'registered'
+        ? 'Leave Event'
       : status === 'waitlisted'
-        ? 'On Waitlist'
+        ? 'Leave Waitlist'
         : isSubmitting
           ? 'Registering…'
           : isFull
             ? 'Join Waitlist'
             : 'Register Now'
-  const isDone = status !== 'idle'
+  const isDone = isOwner
   return (
     <motion.article
       layout
@@ -175,9 +202,9 @@ export function EventCard({
             className={cn(
               'w-full py-4 rounded-[1.25rem] font-bold text-[15px] transition-colors duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20',
               status === 'registered'
-                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-default'
+                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'
                 : status === 'waitlisted'
-                  ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 cursor-default'
+                  ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/20'
                   : isSubmitting
                     ? 'bg-blue-400 text-white/80 cursor-not-allowed'
                     : isFull

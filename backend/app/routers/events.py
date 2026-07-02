@@ -3,8 +3,13 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 from datetime import datetime, timedelta
 from app.database import get_db
+from app.services.notification_service import create_notification_job
 
 router = APIRouter()
+
+
+def ensure_user_profile_columns(db):
+    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url TEXT")
 
 
 def map_event_status(db_status: str) -> str:
@@ -21,6 +26,37 @@ def map_event_status_to_db(api_status: str) -> str:
     if api_status == "Cancelled":
         return "CANCELLED"
     return "DRAFT"
+
+
+def queue_event_notifications_for_joined_students(
+    db,
+    *,
+    event_id: str,
+    notification_type: str,
+    message: str,
+):
+    recipients = db.execute(
+        """
+        SELECT r.id AS registration_id, r.student_id
+        FROM registrations r
+        WHERE r.event_id = %s
+          AND r.status IN ('CONFIRMED', 'WAITLISTED')
+        """,
+        (event_id,),
+    ).fetchall()
+
+    for recipient in recipients:
+        create_notification_job(
+            db,
+            notification_type=notification_type,
+            user_id=str(recipient["student_id"]),
+            event_id=event_id,
+            registration_id=str(recipient["registration_id"]),
+            payload={
+                "event_id": event_id,
+                "message": message,
+            },
+        )
 
 class EventCreate(BaseModel):
     title: str
@@ -112,16 +148,18 @@ def serialize_event(row):
         "organizer": {
             "name": organizer_name or "Unknown Organizer",
             "email": row.get('org_email') or "",
-            "phone": ""
+            "phone": "",
+            "profilePhotoUrl": row.get('org_profile_photo_url') or "",
         },
         "agenda": []
     }
 
 @router.get("/")
 def get_events(db = Depends(get_db)):
+    ensure_user_profile_columns(db)
     events = db.execute("""
         SELECT e.*, 
-               u.first_name, u.last_name, u.email as org_email,
+               u.first_name, u.last_name, u.email as org_email, u.profile_photo_url as org_profile_photo_url,
                (SELECT count(*) FROM registrations r WHERE r.event_id = e.id AND r.status='CONFIRMED') as registered
         FROM events e
         LEFT JOIN users u ON e.organizer_id = u.id
@@ -132,10 +170,11 @@ def get_events(db = Depends(get_db)):
 
 @router.get("/{event_id}")
 def get_event(event_id: str, db=Depends(get_db)):
+    ensure_user_profile_columns(db)
     row = db.execute(
         """
         SELECT e.*,
-               u.first_name, u.last_name, u.email AS org_email,
+               u.first_name, u.last_name, u.email AS org_email, u.profile_photo_url AS org_profile_photo_url,
                (
                    SELECT count(*)
                    FROM registrations r
@@ -245,11 +284,29 @@ def update_event(event_id: str, updates: EventUpdate, db = Depends(get_db)):
             return {"status": "ok"}
             
         values.append(event_id)
-        query = f"UPDATE events SET {', '.join(fields)} WHERE id = %s RETURNING id"
-        
+        query = f"UPDATE events SET {', '.join(fields)} WHERE id = %s RETURNING id, title, status"
+
         res = db.execute(query, tuple(values))
-        if not res.fetchone():
+        row = res.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Event not found")
+
+        event_title = row.get("title") or "Event"
+        if row.get("status") == "CANCELLED":
+            queue_event_notifications_for_joined_students(
+                db,
+                event_id=event_id,
+                notification_type="EventCancelled",
+                message=f"{event_title} was cancelled by the organizer.",
+            )
+        else:
+            queue_event_notifications_for_joined_students(
+                db,
+                event_id=event_id,
+                notification_type="EventUpdated",
+                message=f"{event_title} was updated. Please review the latest details.",
+            )
+
         db.commit()
         return {"status": "ok"}
     except HTTPException:
@@ -263,12 +320,29 @@ def _set_event_status(event_id: str, new_status: str, db):
     """Shared implementation for the publish/cancel endpoints below."""
     try:
         res = db.execute(
-            "UPDATE events SET status = %s WHERE id = %s RETURNING id, status",
+            "UPDATE events SET status = %s WHERE id = %s RETURNING id, status, title",
             (new_status, event_id),
         )
         row = res.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Event not found")
+
+        event_title = row.get("title") or "Event"
+        if new_status == "CANCELLED":
+            queue_event_notifications_for_joined_students(
+                db,
+                event_id=event_id,
+                notification_type="EventCancelled",
+                message=f"{event_title} was cancelled by the organizer.",
+            )
+        else:
+            queue_event_notifications_for_joined_students(
+                db,
+                event_id=event_id,
+                notification_type="EventUpdated",
+                message=f"{event_title} was updated. Please review the latest details.",
+            )
+
         db.commit()
         return {"id": str(row["id"]), "status": "Published" if row["status"] == "PUBLISHED" else ("Cancelled" if row["status"] == "CANCELLED" else "Draft")}
     except HTTPException:

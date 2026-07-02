@@ -23,6 +23,7 @@ export interface EventData {
     name: string
     email: string
     phone: string
+    profilePhotoUrl?: string
   }
   agenda?: { time: string; activity: string }[]
   createdBy?: string // email of user who created it
@@ -35,6 +36,39 @@ export interface Registration {
   status: 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED'
   position: number
   createdAt: string
+}
+
+export interface EventAttendee {
+  registrationId: string
+  userId: string
+  fullName: string
+  email: string
+  profilePhotoUrl?: string
+  status: 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED'
+  position: number | null
+  createdAt: string
+}
+
+export interface NotificationItem {
+  id: string
+  type: string
+  status: string
+  eventTitle?: string
+  message?: string
+  createdAt: string
+  seenAt?: string | null
+  scheduledFor: string
+  completedAt?: string | null
+}
+
+export interface UserProfileData {
+  id?: string
+  email: string
+  role: 'student' | 'organizer'
+  fullName: string
+  profilePhotoUrl?: string
+  bio?: string
+  phone?: string
 }
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -81,6 +115,10 @@ export function getAllEvents(): EventData[] {
 export function getEventById(id: string | number): EventData | undefined {
   const events = getAllEvents()
   return events.find(e => String(e.id) === String(id))
+}
+
+export function getOrganizerEvents(userEmail: string): EventData[] {
+  return getAllEvents().filter(e => e.organizer?.email === userEmail)
 }
 
 // Every mutation below resolves to this shape so the UI can always tell
@@ -170,6 +208,21 @@ export async function cancelEvent(id: string): Promise<ApiResult> {
   }
 }
 
+export async function getEventAttendees(eventId: string): Promise<ApiResult<EventAttendee[]>> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/event/${eventId}`)
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not load attendees') }
+    }
+
+    const data = await res.json()
+    return { ok: true, data: data.items || [] }
+  } catch (err) {
+    console.error('Failed to fetch attendees', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
 export function deleteEvent(id: string) {
   const events = getAllEvents().filter(e => e.id !== id)
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events))
@@ -194,6 +247,14 @@ export function getRegistrationsForUser(userEmail: string): Registration[] {
   return getAllRegistrations().filter(
     r => r.userEmail === userEmail && r.status !== 'CANCELLED'
   )
+}
+
+function upsertRegistrations(registrations: Registration[]) {
+  const current = getAllRegistrations()
+  const map = new Map<string, Registration>()
+  for (const reg of current) map.set(reg.id, reg)
+  for (const reg of registrations) map.set(reg.id, reg)
+  saveRegistrations(Array.from(map.values()))
 }
 
 export function getRegistrationsForEvent(eventId: string): Registration[] {
@@ -250,9 +311,7 @@ export async function registerForEvent(userEmail: string, eventId: string | numb
     if (!res.ok) return { ok: false, error: data.detail || 'Failed to register' }
 
     // Save to local cache so it persists on refresh
-    const allRegs = getAllRegistrations()
-    allRegs.push(data.registration)
-    saveRegistrations(allRegs)
+    upsertRegistrations([data.registration])
 
     // Sync events to get updated capacity
     await syncWithBackend()
@@ -261,6 +320,159 @@ export async function registerForEvent(userEmail: string, eventId: string | numb
   } catch (err) {
     console.error('Failed to register', err)
     return { ok: false, error: 'Network error' }
+  }
+}
+
+export async function fetchUserRegistrationForEvent(userEmail: string, eventId: string | number): Promise<ApiResult<Registration | null>> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/event/${eventId}/user/${encodeURIComponent(userEmail)}`)
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not load registration') }
+    }
+    const data = await res.json()
+    const registration = data.registration ?? null
+    if (registration) upsertRegistrations([registration])
+    return { ok: true, data: registration }
+  } catch (err) {
+    console.error('Failed to fetch user registration for event', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function unregisterFromEvent(userEmail: string, eventId: string | number): Promise<ApiResult> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/${eventId}/unregister`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userEmail }),
+    })
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not unregister from event') }
+    }
+
+    const all = getAllRegistrations().map(r => {
+      if (String(r.eventId) === String(eventId) && r.userEmail === userEmail && r.status !== 'CANCELLED') {
+        return { ...r, status: 'CANCELLED' as const }
+      }
+      return r
+    })
+    saveRegistrations(all)
+    await syncWithBackend()
+    return { ok: true }
+  } catch (err) {
+    console.error('Failed to unregister from event', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function kickRegistration(registrationId: string, organizerEmail: string): Promise<ApiResult> {
+  try {
+    let res = await fetch(`${API_BASE}/registrations/${registrationId}/kick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizerEmail }),
+    })
+    if (!res.ok && res.status !== 404 && res.status !== 405) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not remove attendee') }
+    }
+    if (!res.ok) {
+      res = await fetch(`${API_BASE}/registrations/${registrationId}/kick`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizerEmail }),
+      })
+    }
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not remove attendee') }
+    }
+
+    const all = getAllRegistrations().map(r =>
+      String(r.id) === String(registrationId) ? { ...r, status: 'CANCELLED' as const } : r,
+    )
+    saveRegistrations(all)
+    await syncWithBackend()
+    return { ok: true }
+  } catch (err) {
+    console.error('Failed to kick registration', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function syncRegistrationsForUser(userEmail: string): Promise<ApiResult<Registration[]>> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/user/${encodeURIComponent(userEmail)}`)
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not load registrations') }
+    }
+    const data = await res.json()
+    const items: Registration[] = data.items || []
+    upsertRegistrations(items)
+    return { ok: true, data: items }
+  } catch (err) {
+    console.error('Failed to sync user registrations', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function getUserNotifications(userEmail: string): Promise<ApiResult<NotificationItem[]>> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/notifications/${encodeURIComponent(userEmail)}`)
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not load notifications') }
+    }
+    const data = await res.json()
+    return { ok: true, data: data.items || [] }
+  } catch (err) {
+    console.error('Failed to fetch notifications', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function markUserNotificationsSeen(userEmail: string): Promise<ApiResult<{ markedCount: number }>> {
+  try {
+    const res = await fetch(`${API_BASE}/registrations/notifications/${encodeURIComponent(userEmail)}/seen`, {
+      method: 'POST',
+    })
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not mark notifications as seen') }
+    }
+    const data = await res.json()
+    return { ok: true, data: { markedCount: Number(data.markedCount || 0) } }
+  } catch (err) {
+    console.error('Failed to mark notifications as seen', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function getUserProfile(email: string): Promise<ApiResult<UserProfileData>> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/profile/${encodeURIComponent(email)}`)
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not load profile') }
+    }
+    const data = await res.json()
+    return { ok: true, data: data.user }
+  } catch (err) {
+    console.error('Failed to fetch profile', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
+  }
+}
+
+export async function updateUserProfile(email: string, profile: Partial<UserProfileData>): Promise<ApiResult<UserProfileData>> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/profile/${encodeURIComponent(email)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile),
+    })
+    if (!res.ok) {
+      return { ok: false, error: await readErrorDetail(res, 'Could not update profile') }
+    }
+    const data = await res.json()
+    return { ok: true, data: data.user }
+  } catch (err) {
+    console.error('Failed to update profile', err)
+    return { ok: false, error: 'Network error — could not reach the server' }
   }
 }
 

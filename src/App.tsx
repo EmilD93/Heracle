@@ -11,7 +11,7 @@ import { Settings } from './components/Settings'
 import { LoginPage } from './components/Loginpage.tsx'
 import { RegisterPage } from './components/RegisterPage'
 import { useScreenInit } from './useScreenInit.js'
-import { initializeDataStore, syncWithBackend } from './dataStore'
+import { getUserProfile, initializeDataStore, syncRegistrationsForUser, syncWithBackend } from './dataStore'
 import type { UserAccount } from './authStore'
 import { clearAuth } from './authStore'
 import { applyTheme, getInitialTheme } from './theme'
@@ -71,6 +71,21 @@ export function App() {
   React.useEffect(() => {
     fetchEvents()
   }, [fetchEvents])
+
+  React.useEffect(() => {
+    if (!currentUser?.email) return
+    syncRegistrationsForUser(currentUser.email)
+    getUserProfile(currentUser.email).then(result => {
+      if (!result.ok || !result.data) return
+      const nextUser = {
+        ...currentUser,
+        fullName: result.data.fullName || currentUser.fullName,
+        profilePhotoUrl: result.data.profilePhotoUrl || currentUser.profilePhotoUrl || '',
+      }
+      setCurrentUser(nextUser)
+      localStorage.setItem('heracle_user', JSON.stringify(nextUser))
+    })
+  }, [currentUser?.email])
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
@@ -142,6 +157,8 @@ export function App() {
         setIsCollapsed={setIsSidebarCollapsed}
         userName={currentUser?.fullName ?? 'Guest'}
         userRole={currentUser?.role ?? 'student'}
+        userPhotoUrl={currentUser?.profilePhotoUrl}
+        onOpenProfile={() => handleTabChange('settings')}
         onLogout={handleLogout}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -179,6 +196,8 @@ export function App() {
                 key={`organizer-${refreshKey}`} 
                 setActiveTab={handleTabChange} 
                 onDataChange={refresh}
+                userEmail={userEmail}
+                onPreviewEvent={(id) => { setSelectedEventId(String(id)); setActiveTab('dashboard') }}
                 onEditEvent={(id) => { setEditingEventId(String(id)); handleTabChange('create-event') }}
               />
             )}
@@ -197,7 +216,15 @@ export function App() {
               <CalendarView key={`calendar-${refreshKey}`} onEventSelect={goToEventDetails} />
             )}
             {activeTab === 'settings' && currentUser && (
-              <Settings key="settings" user={currentUser} onLogout={handleLogout} />
+              <Settings
+                key="settings"
+                user={currentUser}
+                onLogout={handleLogout}
+                onUserUpdate={(nextUser) => {
+                  setCurrentUser(nextUser)
+                  localStorage.setItem('heracle_user', JSON.stringify(nextUser))
+                }}
+              />
             )}
             {activeTab !== 'dashboard' &&
               activeTab !== 'organizer' &&

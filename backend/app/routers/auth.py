@@ -54,13 +54,27 @@ class RegisterRequest(BaseModel):
     role: Optional[str] = "student"
 
 
+class ProfileUpdateRequest(BaseModel):
+    fullName: Optional[str] = None
+    profilePhotoUrl: Optional[str] = None
+    bio: Optional[str] = None
+    phone: Optional[str] = None
+
+
+def ensure_user_profile_columns(db):
+    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url TEXT")
+    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT")
+    db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(40)")
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 @router.post("/login")
 def login(req: LoginRequest, db=Depends(get_db)):
+    ensure_user_profile_columns(db)
     res = db.execute(
-        """SELECT id, email, role, first_name AS "firstName", last_name AS "lastName", password_hash
+        """SELECT id, email, role, first_name AS "firstName", last_name AS "lastName", profile_photo_url AS "profilePhotoUrl", password_hash
            FROM users WHERE email = %s""",
         (req.email,),
     ).fetchone()
@@ -86,12 +100,14 @@ def login(req: LoginRequest, db=Depends(get_db)):
             "email": res["email"],
             "fullName": f"{res['firstName']} {res['lastName']}",
             "role": res["role"].lower(),
+            "profilePhotoUrl": res.get("profilePhotoUrl") or "",
         },
     }
 
 
 @router.post("/register")
 def register(req: RegisterRequest, db=Depends(get_db)):
+    ensure_user_profile_columns(db)
     # Провери дали email вече съществува
     existing = db.execute(
         "SELECT id FROM users WHERE email = %s", (req.email,)
@@ -123,6 +139,7 @@ def register(req: RegisterRequest, db=Depends(get_db)):
             "email": req.email,
             "fullName": f"{req.firstName} {req.lastName}",
             "role": req.role.lower(),
+            "profilePhotoUrl": "",
         },
     }
 
@@ -132,6 +149,7 @@ class GoogleLoginRequest(BaseModel):
 @router.post("/google")
 def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
     try:
+        ensure_user_profile_columns(db)
         import requests
         # We can use google-auth id_token if it's a JWT ID token, or an API call if it's an access token
         # @react-oauth/google useGoogleLogin usually returns an access_token. Let's fetch profile using access_token
@@ -153,7 +171,7 @@ def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
         
         # Check if user exists
         existing = db.execute(
-            """SELECT id, email, role, first_name AS "firstName", last_name AS "lastName"
+            """SELECT id, email, role, first_name AS "firstName", last_name AS "lastName", profile_photo_url AS "profilePhotoUrl"
                FROM users WHERE email = %s""",
             (email,)
         ).fetchone()
@@ -162,6 +180,7 @@ def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
             user_id = existing["id"]
             role = existing["role"]
             full_name = f"{existing['firstName']} {existing['lastName']}"
+            profile_photo_url = existing.get("profilePhotoUrl") or ""
         else:
             # Auto-register Google users as STUDENT
             import uuid
@@ -181,6 +200,7 @@ def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
             ).fetchone()
             user_id = new_user["id"]
             full_name = f"{first_name} {last_name}"
+            profile_photo_url = ""
             db.commit()
             
         token = create_token(user_id, email, role.lower())
@@ -193,6 +213,7 @@ def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
                 "email": email,
                 "fullName": full_name,
                 "role": role.lower(),
+                "profilePhotoUrl": profile_photo_url,
             }
         }
     except HTTPException:
@@ -200,3 +221,74 @@ def google_login(req: GoogleLoginRequest, db=Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/profile/{email}")
+def get_profile(email: str, db=Depends(get_db)):
+    ensure_user_profile_columns(db)
+    user = db.execute(
+        """
+        SELECT id, email, role, first_name, last_name, profile_photo_url, bio, phone
+        FROM users
+        WHERE email = %s
+        """,
+        (email,),
+    ).fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    full_name = f"{user['first_name']} {user['last_name']}".strip()
+    return {
+        "ok": True,
+        "user": {
+            "id": str(user["id"]),
+            "email": user["email"],
+            "role": user["role"].lower(),
+            "fullName": full_name,
+            "profilePhotoUrl": user.get("profile_photo_url") or "",
+            "bio": user.get("bio") or "",
+            "phone": user.get("phone") or "",
+        },
+    }
+
+
+@router.patch("/profile/{email}")
+def update_profile(email: str, req: ProfileUpdateRequest, db=Depends(get_db)):
+    ensure_user_profile_columns(db)
+    user = db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    fields = []
+    values = []
+
+    if req.fullName is not None:
+        parts = req.fullName.strip().split()
+        if len(parts) == 0:
+            raise HTTPException(status_code=400, detail="Full name cannot be empty")
+        first_name = parts[0]
+        last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+        fields.append("first_name = %s")
+        values.append(first_name)
+        fields.append("last_name = %s")
+        values.append(last_name)
+
+    if req.profilePhotoUrl is not None:
+        fields.append("profile_photo_url = %s")
+        values.append(req.profilePhotoUrl)
+
+    if req.bio is not None:
+        fields.append("bio = %s")
+        values.append(req.bio)
+
+    if req.phone is not None:
+        fields.append("phone = %s")
+        values.append(req.phone)
+
+    if fields:
+        values.append(email)
+        db.execute(f"UPDATE users SET {', '.join(fields)} WHERE email = %s", tuple(values))
+        db.commit()
+
+    return get_profile(email, db)

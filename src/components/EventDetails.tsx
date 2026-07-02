@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -9,9 +9,11 @@ import {
   Phone,
   Check,
   Clock,
+  UserRound,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { getEventById, getUserRegistrationForEvent, registerForEvent } from '../dataStore'
+import { fetchUserRegistrationForEvent, getEventById, getUserRegistrationForEvent, registerForEvent, getEventAttendees, unregisterFromEvent } from '../dataStore'
+import type { EventAttendee } from '../dataStore'
 
 interface EventDetailsProps {
   eventId: string
@@ -32,43 +34,84 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
   )
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [attendees, setAttendees] = useState<EventAttendee[]>([])
+  const [attendeesLoading, setAttendeesLoading] = useState(false)
+  const isOwner = Boolean(event?.organizer?.email === userEmail)
 
   if (!event) return null
+
+  useEffect(() => {
+    if (!userEmail) return
+    fetchUserRegistrationForEvent(userEmail, eventId).then(result => {
+      if (!result.ok) return
+      const reg = result.data
+      if (!reg) {
+        setStatus('idle')
+        return
+      }
+      setStatus(reg.status === 'CONFIRMED' ? 'registered' : 'waitlisted')
+    })
+  }, [eventId, userEmail])
+
+  useEffect(() => {
+    const loadAttendees = async () => {
+      setAttendeesLoading(true)
+      const result = await getEventAttendees(eventId)
+      setAttendeesLoading(false)
+      if (result.ok) {
+        setAttendees((result.data || []).filter(a => a.status !== 'CANCELLED'))
+      }
+    }
+    loadAttendees()
+  }, [eventId, status])
 
   const isFull = registered >= event.capacity
   const percentage = Math.min(100, (registered / event.capacity) * 100)
 
   const handleAction = async () => {
-    if (status !== 'idle' || isSubmitting) return
+    if (isSubmitting || isOwner) return
     setError(null)
     setIsSubmitting(true)
-    const result = await registerForEvent(userEmail, eventId)
-    setIsSubmitting(false)
-    if (!result.ok) {
-      setError(result.error || 'Registration failed')
-      return
-    }
+    if (status === 'idle') {
+      const result = await registerForEvent(userEmail, eventId)
+      setIsSubmitting(false)
+      if (!result.ok) {
+        setError(result.error || 'Registration failed')
+        return
+      }
 
-    if (result.registration.status === 'CONFIRMED') {
-      setStatus('registered')
-      setRegistered(r => r + 1)
+      if (result.registration.status === 'CONFIRMED') {
+        setStatus('registered')
+        setRegistered(r => r + 1)
+      } else {
+        setStatus('waitlisted')
+      }
     } else {
-      setStatus('waitlisted')
+      const result = await unregisterFromEvent(userEmail, eventId)
+      setIsSubmitting(false)
+      if (!result.ok) {
+        setError(result.error || 'Could not leave event')
+        return
+      }
+      if (status === 'registered') setRegistered(r => Math.max(0, r - 1))
+      setStatus('idle')
     }
     onDataChange()
   }
 
   const buttonLabel =
-    status === 'registered'
-      ? 'Registered'
+    isOwner
+      ? 'Your Event'
+      : status === 'registered'
+        ? 'Leave Event'
       : status === 'waitlisted'
-        ? 'On Waitlist'
+        ? 'Leave Waitlist'
         : isSubmitting
           ? 'Registering…'
           : isFull
             ? 'Join Waitlist'
             : 'Register Now'
-  const isDone = status !== 'idle'
+  const isDone = isOwner
 
   return (
     <motion.div
@@ -142,6 +185,49 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80 dark:border-slate-700/80">
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                Who's In This Event
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mb-5">
+                View confirmed attendees and current waitlist.
+              </p>
+
+              {attendeesLoading ? (
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Loading attendees…</p>
+              ) : attendees.length === 0 ? (
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No attendees yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {attendees.map(a => (
+                    <div key={a.registrationId} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 dark:border-slate-700 p-3 bg-slate-50/60 dark:bg-slate-900/40">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                          {a.profilePhotoUrl ? (
+                            <img src={a.profilePhotoUrl} alt={a.fullName} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <UserRound size={16} />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{a.fullName}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{a.email}</p>
+                        </div>
+                      </div>
+                      <span className={cn(
+                        'px-2.5 py-1 rounded-lg text-xs font-bold border shrink-0',
+                        a.status === 'CONFIRMED'
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20'
+                          : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-500/20',
+                      )}>
+                        {a.status === 'WAITLISTED' && a.position ? `WAITLISTED #${a.position}` : a.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
 
@@ -217,9 +303,9 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
                   className={cn(
                     'w-full py-4 rounded-[1.25rem] font-bold text-[16px] transition-colors duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2',
                     status === 'registered'
-                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-default'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'
                       : status === 'waitlisted'
-                        ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 cursor-default'
+                        ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/20'
                         : isSubmitting
                           ? 'bg-blue-400 text-white/80 cursor-not-allowed'
                           : isFull
@@ -246,9 +332,17 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
                 Organizer
               </h2>
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 rounded-[1.25rem] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-700/60 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/50">
-                  <Users size={24} strokeWidth={2.5} />
-                </div>
+                {event.organizer?.profilePhotoUrl ? (
+                  <img
+                    src={event.organizer.profilePhotoUrl}
+                    alt={event.organizer?.name}
+                    className="w-14 h-14 rounded-[1.25rem] object-cover border border-slate-200/50 dark:border-slate-600/50"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-[1.25rem] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-700/60 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/50">
+                    <Users size={24} strokeWidth={2.5} />
+                  </div>
+                )}
                 <div>
                   <div className="text-[15px] font-bold text-slate-800 dark:text-slate-100">
                     {event.organizer?.name}

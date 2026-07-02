@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Ticket,
   CalendarDays,
-  Settings,
   GraduationCap,
   Briefcase,
   ChevronLeft,
@@ -34,11 +33,6 @@ const navItems = [
     label: 'Organizer',
     icon: Briefcase,
   },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Settings,
-  },
 ]
 
 interface SidebarProps {
@@ -48,12 +42,14 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void
   userName: string
   userRole: 'student' | 'organizer'
+  userPhotoUrl?: string
+  onOpenProfile: () => void
   onLogout: () => void
   theme: Theme
   onToggleTheme: () => void
 }
 
-export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, userName, userRole, onLogout, theme, onToggleTheme }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, userName, userRole, userPhotoUrl, onOpenProfile, onLogout, theme, onToggleTheme }: SidebarProps) {
   const isDark = theme === 'dark'
   return (
     <aside
@@ -81,10 +77,10 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
           <GraduationCap size={26} strokeWidth={2.5} />
         </div>
         <span className={cn(
-          "font-extrabold text-2xl text-slate-800 dark:text-slate-100 tracking-tight transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap block",
+          "brand-wordmark text-2xl transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap block",
           isCollapsed ? "opacity-0 max-w-0 pointer-events-none" : "opacity-100 max-w-[200px]"
         )}>
-          Heracle
+          StudentLink
         </span>
       </div>
 
@@ -159,16 +155,35 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
         </button>
       </nav>
 
-      <div className={cn(
+      <div
+        onClick={onOpenProfile}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onOpenProfile()
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        title="Open profile"
+        className={cn(
         "relative z-10 mt-4 rounded-[1.5rem] transition-all duration-500 ease-in-out w-full flex flex-col items-center gap-2",
         isCollapsed
           ? "p-0 bg-transparent border-transparent"
-          : "bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-800 dark:to-slate-800/60 p-4 border border-slate-100/80 dark:border-slate-700/80"
+          : "bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-800 dark:to-slate-800/60 p-4 border border-slate-100/80 dark:border-slate-700/80 hover:border-blue-200 dark:hover:border-blue-500/30"
       )}>
         <div className={cn("flex items-center transition-all duration-500 ease-in-out w-full", isCollapsed ? "justify-center gap-0" : "justify-start gap-3.5")}>
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
-            {userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-          </div>
+          {userPhotoUrl ? (
+            <img
+              src={userPhotoUrl}
+              alt={userName}
+              className="w-11 h-11 rounded-full object-cover shadow-sm shrink-0 border border-white/70 dark:border-slate-700"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+              {userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+            </div>
+          )}
           <div className={cn(
             "flex flex-col text-left transition-all duration-500 ease-in-out overflow-hidden flex-1 min-w-0",
             isCollapsed ? "opacity-0 max-w-0 pointer-events-none" : "opacity-100 max-w-[200px]"
@@ -181,7 +196,7 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
             </span>
           </div>
           <button
-            onClick={onLogout}
+            onClick={(e) => { e.stopPropagation(); onLogout() }}
             title="Sign out"
             className={cn(
               "shrink-0 w-9 h-9 rounded-[0.75rem] flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer outline-none focus:outline-none",
@@ -193,7 +208,7 @@ export function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
         </div>
         {isCollapsed && (
           <button
-            onClick={onLogout}
+            onClick={(e) => { e.stopPropagation(); onLogout() }}
             title="Sign out"
             className="w-10 h-10 rounded-[0.75rem] flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer outline-none focus:outline-none"
           >
