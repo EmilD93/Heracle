@@ -6,13 +6,7 @@ from app.services.notification_service import ensure_notification_schema
 
 router = APIRouter()
 
-class RegistrationRequest(BaseModel):
-    userEmail: str
-
-
-class UnregisterRequest(BaseModel):
-    userEmail: str
-
+from app.routers.auth import get_current_user
 
 class OrganizerKickRequest(BaseModel):
     organizerEmail: str
@@ -221,9 +215,9 @@ def mark_user_notifications_seen(user_email: str, db=Depends(get_db)):
     return {"ok": True, "markedCount": len(result)}
 
 @router.post("/{event_id}/register")
-def register(event_id: str, req: RegistrationRequest, db = Depends(get_db)):
+def register(event_id: str, current_user=Depends(get_current_user), db = Depends(get_db)):
     try:
-        user = db.execute("SELECT id FROM users WHERE email = %s", (req.userEmail,)).fetchone()
+        user = db.execute("SELECT id FROM users WHERE email = %s", (current_user["email"],)).fetchone()
         if not user:
             raise HTTPException(status_code=400, detail="User not found")
 
@@ -237,7 +231,7 @@ def register(event_id: str, req: RegistrationRequest, db = Depends(get_db)):
             "ok": True,
             "registration": {
                 "id": service_result["registration_id"],
-                "userEmail": req.userEmail,
+                "userEmail": current_user["email"],
                 "eventId": service_result["event_id"],
                 "status": service_result["status"],
                 "position": service_result["position"],
@@ -257,7 +251,7 @@ def register(event_id: str, req: RegistrationRequest, db = Depends(get_db)):
 
 
 @router.delete("/{event_id}/unregister")
-def unregister_from_event(event_id: str, req: UnregisterRequest, db=Depends(get_db)):
+def unregister_from_event(event_id: str, current_user=Depends(get_current_user), db=Depends(get_db)):
     registration = db.execute(
         """
         SELECT r.id
@@ -269,7 +263,7 @@ def unregister_from_event(event_id: str, req: UnregisterRequest, db=Depends(get_
         ORDER BY r.created_at DESC
         LIMIT 1
         """,
-        (event_id, req.userEmail),
+        (event_id, current_user["email"]),
     ).fetchone()
 
     if not registration:

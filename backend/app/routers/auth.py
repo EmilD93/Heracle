@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from app.database import get_db
@@ -6,6 +6,7 @@ import bcrypt
 from jose import jwt
 import os
 from datetime import datetime, timedelta
+from app.limiter import limiter
 
 router = APIRouter()
 
@@ -50,7 +51,7 @@ def require_student(current_user = Depends(get_current_user)):
 
 JWT_SECRET = os.getenv("JWT_SECRET", "heracle_dev_secret_change_in_prod")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = 24 * 7  # 7 дни
+JWT_EXPIRE_HOURS = 1  # 1 hour
 
 
 def create_token(user_id: int, email: str, role: str) -> str:
@@ -87,7 +88,6 @@ class RegisterRequest(BaseModel):
     lastName: str
     email: str
     password: str
-    role: Optional[str] = "student"
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -121,7 +121,8 @@ def get_me(current_user=Depends(get_current_user)):
     }
 
 @router.post("/login")
-def login(req: LoginRequest, db=Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, req: LoginRequest, db=Depends(get_db)):
     ensure_user_profile_columns(db)
     res = db.execute(
         """SELECT id, email, role, first_name AS "firstName", last_name AS "lastName", profile_photo_url AS "profilePhotoUrl", password_hash
@@ -156,7 +157,8 @@ def login(req: LoginRequest, db=Depends(get_db)):
 
 
 @router.post("/register")
-def register(req: RegisterRequest, db=Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, req: RegisterRequest, db=Depends(get_db)):
     ensure_user_profile_columns(db)
     # Провери дали email вече съществува
     existing = db.execute(
@@ -172,14 +174,14 @@ def register(req: RegisterRequest, db=Depends(get_db)):
             """INSERT INTO users (email, password_hash, role, first_name, last_name)
                VALUES (%s, %s, %s, %s, %s)
                RETURNING id""",
-            (req.email, hashed, req.role.upper(), req.firstName, req.lastName),
+            (req.email, hashed, "STUDENT", req.firstName, req.lastName),
         ).fetchone()
         user_id = result["id"]
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail="Registration failed")
 
-    token = create_token(user_id, req.email, req.role.lower())
+    token = create_token(user_id, req.email, "student")
 
     return {
         "access_token": token,
@@ -188,7 +190,7 @@ def register(req: RegisterRequest, db=Depends(get_db)):
             "id": user_id,
             "email": req.email,
             "fullName": f"{req.firstName} {req.lastName}",
-            "role": req.role.lower(),
+            "role": "student",
             "profilePhotoUrl": "",
         },
     }

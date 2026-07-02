@@ -5,6 +5,7 @@
 
 import { EVENTS as SEED_EVENTS } from './data/events'
 import { API_BASE } from './config/api'
+import { authHeaders } from './authStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,12 +301,11 @@ export function cancelRegistration(userEmail: string, eventId: number) {
   saveRegistrations(allRegs)
 }
 
-export async function registerForEvent(userEmail: string, eventId: string | number): Promise<any> {
+export async function registerForEvent(_userEmail: string, eventId: string | number): Promise<any> {
   try {
     const res = await fetch(`${API_BASE}/registrations/${eventId}/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userEmail })
+      headers: authHeaders()
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.detail || 'Failed to register' }
@@ -343,8 +343,7 @@ export async function unregisterFromEvent(userEmail: string, eventId: string | n
   try {
     const res = await fetch(`${API_BASE}/registrations/${eventId}/unregister`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userEmail }),
+      headers: authHeaders()
     })
     if (!res.ok) {
       return { ok: false, error: await readErrorDetail(res, 'Could not unregister from event') }
