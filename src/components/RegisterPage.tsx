@@ -126,7 +126,7 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
           <div className="w-11 h-11 rounded-[1.1rem] bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
             <GraduationCap size={23} strokeWidth={2.5} className="text-white" />
           </div>
-          <span className="font-extrabold text-xl text-white tracking-tight">Campus</span>
+          <span className="brand-wordmark-light text-xl">StudentLink</span>
         </div>
 
         {/* Headline */}
@@ -202,7 +202,7 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
             <div className="w-10 h-10 rounded-[1rem] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
               <GraduationCap size={21} strokeWidth={2.5} className="text-white" />
             </div>
-            <span className="font-extrabold text-xl text-slate-800 tracking-tight">Campus</span>
+            <span className="brand-wordmark text-xl">StudentLink</span>
           </div>
 
           {/* Step indicator (mobile) */}
@@ -244,7 +244,7 @@ export function RegisterPage({ onRegister, onNavigateToLogin }: RegisterPageProp
             )}
             <AnimatedStep show={step === 0}>
               <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight mb-1.5">Create account</h1>
-              <p className="text-slate-500 font-medium text-[15px] mb-8">How will you use Campus?</p>
+              <p className="text-slate-500 font-medium text-[15px] mb-8">How will you use StudentLink?</p>
 
               <div className="space-y-3">
                 {(['student', 'organizer'] as const).map(r => (

@@ -28,7 +28,7 @@ def register_student_for_event(db, *, student_id: str, event_id: str) -> dict:
 
     try:
         event = db.execute(
-            "SELECT id, title, capacity, status FROM events WHERE id = %s",
+            "SELECT id, title, capacity, status, organizer_id FROM events WHERE id = %s",
             (event_id,),
         ).fetchone()
 
@@ -37,6 +37,9 @@ def register_student_for_event(db, *, student_id: str, event_id: str) -> dict:
 
         if event["status"] != "PUBLISHED":
             raise ValueError("Event is not open for registration")
+
+        if event.get("organizer_id") and str(event["organizer_id"]) == str(student_id):
+            raise ValueError("You cannot register for your own event")
 
         existing = db.execute(
             """

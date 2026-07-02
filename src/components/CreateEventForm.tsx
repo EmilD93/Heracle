@@ -48,6 +48,12 @@ const CATEGORIES = [
   'Entertainment',
 ]
 
+const TIME_OPTIONS = Array.from({ length: 48 }).map((_, idx) => {
+  const hour = Math.floor(idx / 2)
+  const minute = idx % 2 === 0 ? '00' : '30'
+  return `${String(hour).padStart(2, '0')}:${minute}`
+})
+
 // ─── Field components ─────────────────────────────────────────────────────────
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
@@ -195,10 +201,12 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [previewFailed, setPreviewFailed] = useState(false)
 
   const set = (field: keyof FormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }))
     setErrors((e) => ({ ...e, [field]: undefined }))
+    if (field === 'imageUrl') setPreviewFailed(false)
   }
 
   // Agenda helpers
@@ -314,7 +322,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
   }
 
   // Live preview image
-  const previewImage = (form.imageUrl?.startsWith('http') || form.imageUrl?.startsWith('blob:') || form.imageUrl?.startsWith('data:')) ? form.imageUrl : null
+  const previewImage = ((form.imageUrl?.startsWith('http') || form.imageUrl?.startsWith('blob:') || form.imageUrl?.startsWith('data:')) && !previewFailed) ? form.imageUrl : null
 
   return (
     <>
@@ -451,25 +459,36 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                   <Input
                     type="date"
                     value={form.date}
+                    min={new Date().toISOString().split('T')[0]}
                     onChange={(e) => set('date', e.target.value)}
                   />
                   {errors.date && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.date}</p>}
                 </div>
                 <div>
-                  <Label>Start time</Label>
-                  <Input
-                    type="time"
+                  <Label>Start time (24h)</Label>
+                  <select
                     value={form.startTime}
                     onChange={(e) => set('startTime', e.target.value)}
-                  />
+                    className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                  >
+                    <option value="">Select</option>
+                    {TIME_OPTIONS.map(time => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <Label>End time</Label>
-                  <Input
-                    type="time"
+                  <Label>End time (24h)</Label>
+                  <select
                     value={form.endTime}
                     onChange={(e) => set('endTime', e.target.value)}
-                  />
+                    className="w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                  >
+                    <option value="">Select</option>
+                    {TIME_OPTIONS.map(time => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </Section>
@@ -586,10 +605,11 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
               <div className="mt-5 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-center transition-all">
                 {previewImage ? (
                   <img
+                    key={previewImage}
                     src={previewImage}
                     alt="Preview"
                     className="w-full h-full object-cover"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                    onError={() => setPreviewFailed(true)}
                   />
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-slate-300 dark:text-slate-600">

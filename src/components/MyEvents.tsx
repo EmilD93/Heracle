@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar,
@@ -11,7 +11,7 @@ import {
   Search,
 } from 'lucide-react'
 import { cn } from '../utils/cn'
-import { getMyEvents } from '../dataStore'
+import { getMyEvents, syncRegistrationsForUser, unregisterFromEvent } from '../dataStore'
 import type { MyEventEnriched } from '../dataStore'
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -268,10 +268,28 @@ export function MyEvents({ userEmail }: MyEventsProps) {
   const [activeTab, setActiveTab] = useState<Tab>('All')
   const [selectedEvent, setSelectedEvent] = useState<MyEventEnriched | null>(null)
   const [query, setQuery] = useState('')
+  const [myEvents, setMyEvents] = useState<MyEventEnriched[]>(() => getMyEvents(userEmail))
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const MY_EVENTS = getMyEvents(userEmail)
+  const refreshMyEvents = () => {
+    setMyEvents(getMyEvents(userEmail))
+  }
 
-  const filtered = MY_EVENTS.filter((e) => {
+  useEffect(() => {
+    syncRegistrationsForUser(userEmail).finally(refreshMyEvents)
+  }, [userEmail])
+
+  const handleLeaveEvent = async (eventId: string) => {
+    setActionError(null)
+    const result = await unregisterFromEvent(userEmail, eventId)
+    if (!result.ok) {
+      setActionError(result.error || 'Could not leave event')
+      return
+    }
+    refreshMyEvents()
+  }
+
+  const filtered = myEvents.filter((e) => {
     const matchesTab =
       activeTab === 'All' ||
       e.status === activeTab.toLowerCase()
@@ -283,10 +301,10 @@ export function MyEvents({ userEmail }: MyEventsProps) {
   })
 
   const counts: Record<Tab, number> = {
-    All: MY_EVENTS.length,
-    Upcoming: MY_EVENTS.filter((e) => e.status === 'upcoming').length,
-    Waitlisted: MY_EVENTS.filter((e) => e.status === 'waitlisted').length,
-    Past: MY_EVENTS.filter((e) => e.status === 'past').length,
+    All: myEvents.length,
+    Upcoming: myEvents.filter((e) => e.status === 'upcoming').length,
+    Waitlisted: myEvents.filter((e) => e.status === 'waitlisted').length,
+    Past: myEvents.filter((e) => e.status === 'past').length,
   }
 
   return (
@@ -394,15 +412,26 @@ export function MyEvents({ userEmail }: MyEventsProps) {
         </div>
 
         {/* Event list */}
+        {actionError && (
+          <p className="mb-4 text-sm font-semibold text-red-500 dark:text-red-400">{actionError}</p>
+        )}
         <div className="space-y-3 pb-10">
           <AnimatePresence mode="popLayout">
             {filtered.length > 0 ? (
               filtered.map((event) => (
-                <EventRow
-                  key={event.id}
-                  event={event}
-                  onViewTicket={setSelectedEvent}
-                />
+                <div key={event.id} className="space-y-2">
+                  <EventRow event={event} onViewTicket={setSelectedEvent} />
+                  {event.status !== 'past' && (
+                    <div className="flex justify-end pr-2">
+                      <button
+                        onClick={() => handleLeaveEvent(event.id)}
+                        className="px-4 py-2 rounded-xl text-xs font-bold border border-red-100 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+                      >
+                        {event.status === 'waitlisted' ? 'Leave Waitlist' : 'Leave Event'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))
             ) : (
               <motion.div

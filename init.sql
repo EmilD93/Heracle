@@ -65,6 +65,7 @@ CREATE TABLE notification_jobs (
 
     scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     locked_at TIMESTAMP WITH TIME ZONE,
+    seen_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     failed_at TIMESTAMP WITH TIME ZONE,
     error_message TEXT,
@@ -76,7 +77,8 @@ CREATE TABLE notification_jobs (
             'RegistrationConfirmed',
             'RegistrationWaitlisted',
             'WaitlistPromoted',
-            'EventCancelled'
+            'EventCancelled',
+            'EventUpdated'
         )
     ),
 
