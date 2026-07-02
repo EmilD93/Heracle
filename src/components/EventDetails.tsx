@@ -80,9 +80,9 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
       <div className="p-10 pb-20 max-w-5xl mx-auto">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold mb-8 transition-colors group"
+          className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-bold mb-8 transition-colors group"
         >
-          <div className="w-10 h-10 rounded-[1rem] bg-white/80 border border-slate-200/80 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-100 transition-all shadow-sm">
+          <div className="w-10 h-10 rounded-[1rem] bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center group-hover:bg-blue-50 dark:group-hover:bg-blue-500/10 group-hover:border-blue-100 dark:group-hover:border-blue-500/20 transition-all shadow-sm">
             <ArrowLeft
               size={20}
               strokeWidth={2.5}
@@ -92,7 +92,7 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
           Back to Dashboard
         </button>
 
-        <div className="relative h-80 rounded-[2.5rem] overflow-hidden mb-10 shadow-sm border border-slate-100/50">
+        <div className="relative h-80 rounded-[2.5rem] overflow-hidden mb-10 shadow-sm border border-slate-100/50 dark:border-slate-800/50">
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10" />
           <img
             src={event.image}
@@ -111,31 +111,31 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            <section className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80">
-              <h2 className="text-2xl font-bold text-slate-800 mb-4">
+            <section className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80 dark:border-slate-700/80">
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4">
                 About this event
               </h2>
-              <p className="text-slate-600 leading-relaxed text-[15px] font-medium">
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[15px] font-medium">
                 {event.description}
               </p>
             </section>
 
-            <section className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80">
-              <h2 className="text-2xl font-bold text-slate-800 mb-6">
+            <section className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80 dark:border-slate-700/80">
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">
                 Schedule
               </h2>
               <div className="space-y-6">
                 {event.agenda?.map((item, i) => (
                   <div key={i} className="flex gap-6 relative">
                     {i !== event.agenda!.length - 1 && (
-                      <div className="absolute left-[11px] top-8 bottom-[-24px] w-0.5 bg-slate-100" />
+                      <div className="absolute left-[11px] top-8 bottom-[-24px] w-0.5 bg-slate-100 dark:bg-slate-700" />
                     )}
-                    <div className="w-6 h-6 rounded-full bg-blue-50 border-4 border-white shadow-sm flex-shrink-0 z-10 mt-1" />
+                    <div className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-500/10 border-4 border-white dark:border-slate-800 shadow-sm flex-shrink-0 z-10 mt-1" />
                     <div>
-                      <div className="text-[15px] font-bold text-blue-600 mb-1">
+                      <div className="text-[15px] font-bold text-blue-600 dark:text-blue-400 mb-1">
                         {item.time}
                       </div>
-                      <div className="text-[15px] font-medium text-slate-700">
+                      <div className="text-[15px] font-medium text-slate-700 dark:text-slate-300">
                         {item.activity}
                       </div>
                     </div>
@@ -146,57 +146,57 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
           </div>
 
           <div className="space-y-8">
-            <section className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80">
-              <h2 className="text-xl font-bold text-slate-800 mb-6">
+            <section className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80 dark:border-slate-700/80">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">
                 Event Details
               </h2>
 
               <div className="space-y-6 mb-8">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-[1.25rem] bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <div className="w-12 h-12 rounded-[1.25rem] bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                     <Calendar size={22} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-slate-500 mb-1">
+                    <div className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">
                       Date & Time
                     </div>
-                    <div className="text-[15px] font-semibold text-slate-800">
+                    <div className="text-[15px] font-semibold text-slate-800 dark:text-slate-100">
                       {event.date}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-[1.25rem] bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                  <div className="w-12 h-12 rounded-[1.25rem] bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
                     <MapPin size={22} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-slate-500 mb-1">
+                    <div className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">
                       Location
                     </div>
-                    <div className="text-[15px] font-semibold text-slate-800">
+                    <div className="text-[15px] font-semibold text-slate-800 dark:text-slate-100">
                       {event.location}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100">
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-700">
                 <div className="flex justify-between text-[14px] font-bold mb-3">
                   <span
                     className={cn(
-                      isFull ? 'text-amber-600' : 'text-emerald-600',
+                      isFull ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400',
                     )}
                   >
                     {isFull
                       ? 'Waitlist Only'
                       : `${event.capacity - registered} spots left`}
                   </span>
-                  <span className="text-slate-400">
+                  <span className="text-slate-400 dark:text-slate-500">
                     {registered}/{event.capacity}
                   </span>
                 </div>
-                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden mb-6">
+                <div className="h-3 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-6">
                   <motion.div
                     className={cn(
                       'h-full rounded-full',
@@ -217,13 +217,13 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
                   className={cn(
                     'w-full py-4 rounded-[1.25rem] font-bold text-[16px] transition-colors duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2',
                     status === 'registered'
-                      ? 'bg-emerald-50 text-emerald-700 cursor-default'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-default'
                       : status === 'waitlisted'
-                        ? 'bg-amber-100 text-amber-800 cursor-default'
+                        ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 cursor-default'
                         : isSubmitting
                           ? 'bg-blue-400 text-white/80 cursor-not-allowed'
                           : isFull
-                            ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20'
                             : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700',
                   )}
                 >
@@ -236,24 +236,24 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
                   {buttonLabel}
                 </motion.button>
                 {error && (
-                  <p className="mt-3 text-sm font-semibold text-red-500 text-center">{error}</p>
+                  <p className="mt-3 text-sm font-semibold text-red-500 dark:text-red-400 text-center">{error}</p>
                 )}
               </div>
             </section>
 
-            <section className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80">
-              <h2 className="text-xl font-bold text-slate-800 mb-6">
+            <section className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] p-8 shadow-sm border border-slate-100/80 dark:border-slate-700/80">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">
                 Organizer
               </h2>
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 rounded-[1.25rem] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 border border-slate-200/50">
+                <div className="w-14 h-14 rounded-[1.25rem] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-700/60 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/50">
                   <Users size={24} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <div className="text-[15px] font-bold text-slate-800">
+                  <div className="text-[15px] font-bold text-slate-800 dark:text-slate-100">
                     {event.organizer?.name}
                   </div>
-                  <div className="text-sm font-medium text-slate-500">
+                  <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
                     Event Host
                   </div>
                 </div>
@@ -261,16 +261,16 @@ export function EventDetails({ eventId, userEmail, onBack, onDataChange }: Event
               <div className="space-y-3">
                 <a
                   href={`mailto:${event.organizer?.email}`}
-                  className="flex items-center gap-3 text-[14px] font-medium text-slate-600 hover:text-blue-600 transition-colors bg-slate-50 p-3 rounded-[1rem]"
+                  className="flex items-center gap-3 text-[14px] font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-slate-50 dark:bg-slate-700/60 p-3 rounded-[1rem]"
                 >
-                  <Mail size={18} className="text-slate-400" />
+                  <Mail size={18} className="text-slate-400 dark:text-slate-500" />
                   {event.organizer?.email}
                 </a>
                 <a
                   href={`tel:${event.organizer?.phone}`}
-                  className="flex items-center gap-3 text-[14px] font-medium text-slate-600 hover:text-blue-600 transition-colors bg-slate-50 p-3 rounded-[1rem]"
+                  className="flex items-center gap-3 text-[14px] font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-slate-50 dark:bg-slate-700/60 p-3 rounded-[1rem]"
                 >
-                  <Phone size={18} className="text-slate-400" />
+                  <Phone size={18} className="text-slate-400 dark:text-slate-500" />
                   {event.organizer?.phone}
                 </a>
               </div>

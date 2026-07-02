@@ -96,7 +96,7 @@ export function EventCard({
       }}
       onClick={() => onSelect?.(id)}
       className={cn(
-        'group bg-white rounded-[2rem] p-3 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-shadow duration-500 border border-slate-100/80 flex flex-col h-full',
+        'group bg-white dark:bg-slate-800 rounded-[2rem] p-3 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-shadow duration-500 border border-slate-100/80 dark:border-slate-700/80 flex flex-col h-full',
         onSelect && 'cursor-pointer',
       )}
     >
@@ -115,16 +115,16 @@ export function EventCard({
       </div>
 
       <div className="px-3 pb-3 flex flex-col flex-1">
-        <h3 className="text-[1.35rem] font-bold text-slate-800 mb-2.5 line-clamp-1 group-hover:text-blue-600 transition-colors leading-tight">
+        <h3 className="text-[1.35rem] font-bold text-slate-800 dark:text-slate-100 mb-2.5 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight">
           {title}
         </h3>
-        <p className="text-[15px] text-slate-500 mb-7 line-clamp-2 leading-relaxed font-medium">
+        <p className="text-[15px] text-slate-500 dark:text-slate-400 mb-7 line-clamp-2 leading-relaxed font-medium">
           {description}
         </p>
 
         <div className="mt-auto space-y-6">
-          <div className="flex items-center gap-3 text-[15px] text-slate-600 font-semibold">
-            <div className="w-10 h-10 rounded-[0.85rem] bg-blue-50/80 flex items-center justify-center text-blue-600 shadow-sm">
+          <div className="flex items-center gap-3 text-[15px] text-slate-600 dark:text-slate-300 font-semibold">
+            <div className="w-10 h-10 rounded-[0.85rem] bg-blue-50/80 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm">
               <Calendar size={18} strokeWidth={2.5} />
             </div>
             {date}
@@ -133,17 +133,17 @@ export function EventCard({
           <div className="space-y-2.5">
             <div className="flex justify-between text-[13px] font-bold">
               <span
-                className={cn(isFull ? 'text-amber-600' : 'text-emerald-600')}
+                className={cn(isFull ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}
               >
                 {isFull
                   ? 'Waitlist Only'
                   : `${capacity - registered} spots left`}
               </span>
-              <span className="text-slate-400">
+              <span className="text-slate-400 dark:text-slate-500">
                 {registered}/{capacity}
               </span>
             </div>
-            <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
               <motion.div
                 className={cn(
                   'h-full rounded-full',
@@ -175,13 +175,13 @@ export function EventCard({
             className={cn(
               'w-full py-4 rounded-[1.25rem] font-bold text-[15px] transition-colors duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20',
               status === 'registered'
-                ? 'bg-emerald-50 text-emerald-700 cursor-default'
+                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-default'
                 : status === 'waitlisted'
-                  ? 'bg-amber-100 text-amber-800 cursor-default'
+                  ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 cursor-default'
                   : isSubmitting
                     ? 'bg-blue-400 text-white/80 cursor-not-allowed'
                     : isFull
-                      ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20'
                       : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700',
             )}
           >

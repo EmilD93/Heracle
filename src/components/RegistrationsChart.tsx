@@ -40,9 +40,9 @@ const DATA = [
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload || payload.length === 0) return null
   return (
-    <div className="bg-white rounded-[1rem] shadow-lg border border-slate-100 px-4 py-2.5">
-      <p className="text-xs font-bold text-slate-400 mb-0.5">{label}</p>
-      <p className="text-sm font-extrabold text-slate-800">
+    <div className="bg-white dark:bg-slate-800 rounded-[1rem] shadow-lg border border-slate-100 dark:border-slate-700 px-4 py-2.5">
+      <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-0.5">{label}</p>
+      <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
         {payload[0].value.toLocaleString()} registrations
       </p>
     </div>
@@ -62,19 +62,19 @@ export function RegistrationsChart() {
       transition={{
         delay: 0.15,
       }}
-      className="bg-white/80 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-100/80 p-6 flex flex-col"
+      className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] shadow-sm border border-slate-100/80 dark:border-slate-700/80 p-6 flex flex-col"
       aria-label="Registrations over the past week"
     >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
             Registrations This Week
           </h2>
-          <p className="text-sm font-semibold text-slate-500 mt-0.5">
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
             Total sign-ups across all events
           </p>
         </div>
-        <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-100/50">
+        <span className="px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-100/50 dark:border-emerald-500/20">
           +18% vs last week
         </span>
       </div>

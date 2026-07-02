@@ -52,9 +52,9 @@ const CATEGORIES = [
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="block text-sm font-bold text-slate-600 mb-2">
+    <label className="block text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">
       {children}
-      {required && <span className="text-red-400 ml-1">*</span>}
+      {required && <span className="text-red-400 dark:text-red-400 ml-1">*</span>}
     </label>
   )
 }
@@ -67,7 +67,7 @@ function Input({
     <input
       {...props}
       className={cn(
-        'w-full bg-white/80 border border-slate-200/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all',
+        'w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all',
         className,
       )}
     />
@@ -82,7 +82,7 @@ function Textarea({
     <textarea
       {...props}
       className={cn(
-        'w-full bg-white/80 border border-slate-200/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all resize-none',
+        'w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all resize-none',
         className,
       )}
     />
@@ -101,18 +101,18 @@ function Section({
   color?: 'blue' | 'emerald' | 'violet' | 'amber'
 }) {
   const colorMap = {
-    blue: 'bg-blue-50 text-blue-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    violet: 'bg-violet-50 text-violet-600',
-    amber: 'bg-amber-50 text-amber-600',
+    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    violet: 'bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400',
+    amber: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
   }
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-7 border border-slate-100/80 shadow-sm">
+    <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[2rem] p-7 border border-slate-100/80 dark:border-slate-700/80 shadow-sm">
       <div className="flex items-center gap-3 mb-6">
         <div className={cn('w-10 h-10 rounded-[0.875rem] flex items-center justify-center shrink-0', colorMap[color])}>
           <Icon size={20} strokeWidth={2.5} />
         </div>
-        <h2 className="text-lg font-extrabold text-slate-800">{title}</h2>
+        <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">{title}</h2>
       </div>
       {children}
     </div>
@@ -308,9 +308,9 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold transition-colors group"
+              className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-bold transition-colors group"
             >
-              <div className="w-10 h-10 rounded-[1rem] bg-white/80 border border-slate-200/80 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-100 transition-all shadow-sm">
+              <div className="w-10 h-10 rounded-[1rem] bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center group-hover:bg-blue-50 dark:group-hover:bg-blue-500/10 group-hover:border-blue-100 dark:group-hover:border-blue-500/20 transition-all shadow-sm">
                 <ArrowLeft size={20} strokeWidth={2.5} className="group-hover:-translate-x-1 transition-transform" />
               </div>
               Organizer Dashboard
@@ -320,7 +320,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
           <div className="flex items-center gap-3">
             <button
               onClick={handleSaveDraft}
-              className="flex items-center gap-2 px-5 py-3 bg-white/80 border border-slate-200/80 text-slate-700 rounded-[1.25rem] font-bold text-[14px] hover:bg-slate-50 transition-all shadow-sm focus:outline-none"
+              className="flex items-center gap-2 px-5 py-3 bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 rounded-[1.25rem] font-bold text-[14px] hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm focus:outline-none"
             >
               <Save size={17} strokeWidth={2.5} />
               Save draft
@@ -337,10 +337,10 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
 
         <div className="flex items-start gap-3 mb-10">
           <div>
-            <h1 className="text-4xl font-extrabold text-slate-800 tracking-tight mb-2">
+            <h1 className="text-4xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight mb-2">
               {eventIdToEdit ? 'Edit Event' : 'Create New Event'}
             </h1>
-            <p className="text-slate-500 font-semibold text-lg">
+            <p className="text-slate-500 dark:text-slate-400 font-semibold text-lg">
               {eventIdToEdit ? 'Update your event details' : 'Fill in the details and publish when ready'}
             </p>
           </div>
@@ -360,7 +360,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     value={form.title}
                     onChange={(e) => set('title', e.target.value)}
                   />
-                  {errors.title && <p className="mt-1.5 text-xs font-bold text-red-500">{errors.title}</p>}
+                  {errors.title && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.title}</p>}
                 </div>
 
                 <div>
@@ -369,15 +369,15 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     <button
                       onClick={() => setCategoryOpen((o) => !o)}
                       className={cn(
-                        'w-full bg-white/80 border border-slate-200/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-left flex items-center justify-between transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500',
-                        !form.category && 'text-slate-400',
+                        'w-full bg-white/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 rounded-[1rem] px-4 py-3 text-[15px] font-medium text-left flex items-center justify-between transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500',
+                        !form.category ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100',
                       )}
                     >
                       {form.category || 'Select a category'}
                       <ChevronDown
                         size={18}
                         strokeWidth={2.5}
-                        className={cn('text-slate-400 transition-transform duration-200', categoryOpen && 'rotate-180')}
+                        className={cn('text-slate-400 dark:text-slate-500 transition-transform duration-200', categoryOpen && 'rotate-180')}
                       />
                     </button>
                     <AnimatePresence>
@@ -386,15 +386,15 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                           initial={{ opacity: 0, y: -8 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -8 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-900/10 z-20 overflow-hidden max-h-48 overflow-y-auto"
+                          className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-[1.25rem] border border-slate-100 dark:border-slate-700 shadow-xl shadow-slate-900/10 z-20 overflow-hidden max-h-48 overflow-y-auto"
                         >
                           {CATEGORIES.map((cat) => (
                             <button
                               key={cat}
                               onClick={() => { set('category', cat); setCategoryOpen(false) }}
                               className={cn(
-                                'w-full text-left px-5 py-3 text-[15px] font-semibold hover:bg-blue-50 hover:text-blue-600 transition-colors',
-                                form.category === cat ? 'text-blue-600 bg-blue-50/60' : 'text-slate-700',
+                                'w-full text-left px-5 py-3 text-[15px] font-semibold hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-colors',
+                                form.category === cat ? 'text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-500/10' : 'text-slate-700 dark:text-slate-300',
                               )}
                             >
                               {cat}
@@ -404,7 +404,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                       )}
                     </AnimatePresence>
                   </div>
-                  {errors.category && <p className="mt-1.5 text-xs font-bold text-red-500">{errors.category}</p>}
+                  {errors.category && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.category}</p>}
                 </div>
 
                 <div>
@@ -415,7 +415,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     value={form.description}
                     onChange={(e) => set('description', e.target.value)}
                   />
-                  {errors.description && <p className="mt-1.5 text-xs font-bold text-red-500">{errors.description}</p>}
+                  {errors.description && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.description}</p>}
                 </div>
               </div>
             </Section>
@@ -430,7 +430,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     value={form.date}
                     onChange={(e) => set('date', e.target.value)}
                   />
-                  {errors.date && <p className="mt-1.5 text-xs font-bold text-red-500">{errors.date}</p>}
+                  {errors.date && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.date}</p>}
                 </div>
                 <div>
                   <Label>Start time</Label>
@@ -456,7 +456,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
               <div className="space-y-3 mb-4">
                 {form.agenda.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-emerald-50 border-4 border-white shadow-sm shrink-0 mt-0.5" />
+                    <div className="w-6 h-6 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border-4 border-white dark:border-slate-800 shadow-sm shrink-0 mt-0.5" />
                     <Input
                       placeholder="10:00 AM"
                       value={item.time}
@@ -472,7 +472,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     {form.agenda.length > 1 && (
                       <button
                         onClick={() => removeAgendaItem(item.id)}
-                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:outline-none shrink-0"
+                        className="p-2 text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors focus:outline-none shrink-0"
                       >
                         <Trash2 size={16} strokeWidth={2.5} />
                       </button>
@@ -482,7 +482,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
               </div>
               <button
                 onClick={addAgendaItem}
-                className="flex items-center gap-2 text-[14px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors focus:outline-none"
+                className="flex items-center gap-2 text-[14px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors focus:outline-none"
               >
                 <Plus size={16} strokeWidth={2.5} />
                 Add schedule item
@@ -508,7 +508,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                 <div>
                   <Label required>Capacity</Label>
                   <div className="relative">
-                    <Users size={17} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <Users size={17} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
                     <Input
                       type="number"
                       placeholder="100"
@@ -518,7 +518,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                       className="pl-11"
                     />
                   </div>
-                  {errors.capacity && <p className="mt-1.5 text-xs font-bold text-red-500">{errors.capacity}</p>}
+                  {errors.capacity && <p className="mt-1.5 text-xs font-bold text-red-500 dark:text-red-400">{errors.capacity}</p>}
                 </div>
               </div>
             </Section>
@@ -532,19 +532,19 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="block w-full text-sm text-slate-500
+                    className="block w-full text-sm text-slate-500 dark:text-slate-400
                       file:mr-4 file:py-2.5 file:px-5
                       file:rounded-[1rem] file:border-0
                       file:text-sm file:font-bold
-                      file:bg-amber-50 file:text-amber-700
-                      hover:file:bg-amber-100 transition-all cursor-pointer"
+                      file:bg-amber-50 dark:file:bg-amber-500/10 file:text-amber-700 dark:file:text-amber-400
+                      hover:file:bg-amber-100 dark:hover:file:bg-amber-500/20 transition-all cursor-pointer"
                   />
                 </div>
-                
+
                 <div className="flex items-center gap-4">
-                  <div className="flex-1 border-t border-slate-100"></div>
-                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">or</span>
-                  <div className="flex-1 border-t border-slate-100"></div>
+                  <div className="flex-1 border-t border-slate-100 dark:border-slate-700"></div>
+                  <span className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">or</span>
+                  <div className="flex-1 border-t border-slate-100 dark:border-slate-700"></div>
                 </div>
 
                 <div>
@@ -554,13 +554,13 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     value={form.imageUrl}
                     onChange={(e) => set('imageUrl', e.target.value)}
                   />
-                  <p className="mt-2 text-xs font-medium text-slate-400">
+                  <p className="mt-2 text-xs font-medium text-slate-400 dark:text-slate-500">
                     Paste a direct image link or upload a file to preview below.
                   </p>
                 </div>
               </div>
 
-              <div className="mt-5 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center transition-all">
+              <div className="mt-5 h-40 rounded-[1.25rem] overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-center transition-all">
                 {previewImage ? (
                   <img
                     src={previewImage}
@@ -569,7 +569,7 @@ export function CreateEventForm({ onBack, userEmail, eventIdToEdit }: CreateEven
                     onError={(e) => (e.currentTarget.style.display = 'none')}
                   />
                 ) : (
-                  <div className="flex flex-col items-center gap-2 text-slate-300">
+                  <div className="flex flex-col items-center gap-2 text-slate-300 dark:text-slate-600">
                     <ImageIcon size={32} strokeWidth={1.5} />
                     <span className="text-xs font-bold">No image yet</span>
                   </div>
