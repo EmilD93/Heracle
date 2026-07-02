@@ -29,3 +29,12 @@ __pycache__/
 backend/__pycache__
 *.pyc
 
+backend/venv/
+venv/
+.venv/
+
+.vite/
+node_modules/
+backend/venv/
+.venv/
+__pycache__/
