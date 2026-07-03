@@ -36,7 +36,7 @@ export async function loginWithGoogle(token: string): Promise<{ ok: true; user: 
     }
     
     const data = await res.json()
-    localStorage.setItem('auth_token', data.access_token)
+    saveToken(data.access_token)
     
     // Convert role to strictly 'student' | 'organizer'
     const normalizedRole = data.user.role.toLowerCase() === 'organizer' ? 'organizer' : 'student'
@@ -48,7 +48,7 @@ export async function loginWithGoogle(token: string): Promise<{ ok: true; user: 
       role: normalizedRole,
       profilePhotoUrl: data.user.profilePhotoUrl || '',
     }
-    localStorage.setItem('auth_user', JSON.stringify(user))
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
     
     return { ok: true, user }
   } catch (error) {
@@ -58,8 +58,7 @@ export async function loginWithGoogle(token: string): Promise<{ ok: true; user: 
 }
 
 export function logoutUser(): void {
-  localStorage.removeItem('auth_token')
-  localStorage.removeItem('auth_user')
+  clearAuth()
 }
 
 export function clearAuth(): void {
