@@ -19,4 +19,4 @@ INSERT INTO registrations (student_id, event_id, status) VALUES
 
 -- Insert Notification Jobs
 INSERT INTO notification_jobs (event_id, user_id, type, payload, status, scheduled_for) VALUES
-('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'EVENT_REMINDER', '{"message": "Workshop starts tomorrow!"}', 'pending', NOW() + INTERVAL '12 hours');
+('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'RegistrationConfirmed', '{"message": "Workshop starts tomorrow!"}', 'pending', NOW() + INTERVAL '12 hours');
